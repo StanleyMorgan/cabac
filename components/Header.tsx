@@ -6,10 +6,9 @@ interface HeaderProps {
   isWalletConnected: boolean;
   userAddress: string | null;
   onConnectWallet: () => void;
-  onDisconnectWallet: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConnectWallet, onDisconnectWallet }) => {
+const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConnectWallet }) => {
   return (
     <header className="fixed top-0 left-0 right-0 bg-brand-surface/80 backdrop-blur-md border-b border-brand-secondary z-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,7 +21,6 @@ const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConne
             isConnected={isWalletConnected}
             address={userAddress}
             onConnect={onConnectWallet}
-            onDisconnect={onDisconnectWallet}
           />
         </div>
       </div>
