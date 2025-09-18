@@ -2,57 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cabac</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'brand-bg': '#0D111C',
-              'brand-surface': '#171B26',
-              'brand-surface-2': '#212631',
-              'brand-primary': '#4C82FB',
-              'brand-primary-hover': '#6C9BFF',
-              'brand-secondary': '#2C3140',
-              'brand-text-primary': '#F0F0F0',
-              'brand-text-secondary': '#A0A0A0',
-              'brand-accent': '#FF4B4B',
-            },
-            fontFamily: {
-              sans: ['"Inter"', 'sans-serif'],
-              mono: ['"Roboto Mono"', 'monospace'],
-            },
-          },
-        },
-      }
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <script type="importmap">
+  <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@5.51.1",
-    "wagmi": "https://esm.sh/wagmi@2.10.4",
-    "@wagmi/core": "https://esm.sh/@wagmi/core@2.10.4",
-    "@wagmi/react": "https://esm.sh/@wagmi/react@2.10.4",
-    "viem": "https://esm.sh/viem@2.17.4",
-    "viem/chains": "https://esm.sh/viem@2.17.4/chains",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "wagmi": "https://aistudiocdn.com/wagmi@^2.17.0",
     "vite": "https://aistudiocdn.com/vite@^7.1.6",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.3",
     "wagmi/": "https://aistudiocdn.com/wagmi@^2.17.0/",
-    "viem/": "https://aistudiocdn.com/viem@^2.37.6/"
+    "@tanstack/react-query": "https://aistudiocdn.com/@tanstack/react-query@^5.89.0",
+    "@rainbow-me/rainbowkit/": "https://aistudiocdn.com/@rainbow-me/rainbowkit@^2.2.8/",
+    "@rainbow-me/rainbowkit": "https://aistudiocdn.com/@rainbow-me/rainbowkit@^2.2.8"
   }
 }
 </script>
-  </head>
+</head>
   <body class="bg-brand-bg text-brand-text-primary">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

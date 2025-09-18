@@ -1,14 +1,8 @@
 import React from 'react';
-import ConnectWalletButton from './ConnectWalletButton';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { BeerMugIcon } from './icons/BeerMugIcon';
 
-interface HeaderProps {
-  isWalletConnected: boolean;
-  userAddress: string | null;
-  onConnectWallet: () => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConnectWallet }) => {
+const Header: React.FC = () => {
   return (
     <header className="fixed top-0 left-0 right-0 bg-brand-surface/80 backdrop-blur-md border-b border-brand-secondary z-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,11 +11,7 @@ const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConne
             <BeerMugIcon className="h-8 w-8 text-brand-primary" />
             <span className="text-xl font-bold text-brand-text-primary">Cabac</span>
           </div>
-          <ConnectWalletButton
-            isConnected={isWalletConnected}
-            address={userAddress}
-            onConnect={onConnectWallet}
-          />
+          <ConnectButton />
         </div>
       </div>
     </header>

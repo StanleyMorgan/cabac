@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Token } from '../types';
 import { TOKENS } from '../constants';
@@ -6,15 +5,14 @@ import TokenInput from './TokenInput';
 import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
-import { SwapIcon } from './icons/SwapIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 
 interface SwapCardProps {
     isWalletConnected: boolean;
-    onConnectWallet: () => void;
 }
 
-const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected, onConnectWallet }) => {
+const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [tokenIn, setTokenIn] = useState<Token>(TOKENS[0]);
     const [tokenOut, setTokenOut] = useState<Token>(TOKENS[2]);
     const [amountIn, setAmountIn] = useState('');
@@ -23,6 +21,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected, onConnectWallet 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [slippage, setSlippage] = useState(0.5);
     const [mockExchangeRate, setMockExchangeRate] = useState(3000);
+    const { openConnectModal } = useConnectModal();
+
 
     useEffect(() => {
         // Simulate fetching a new exchange rate when tokens change
@@ -120,7 +120,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected, onConnectWallet 
                      </button>
                 ) : (
                     <button
-                        onClick={onConnectWallet}
+                        onClick={openConnectModal}
                         className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover transition-all mt-4"
                      >
                         Connect Wallet
@@ -150,4 +150,3 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected, onConnectWallet 
 };
 
 export default SwapCard;
-
