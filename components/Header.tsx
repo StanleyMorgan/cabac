@@ -1,0 +1,33 @@
+import React from 'react';
+import ConnectWalletButton from './ConnectWalletButton';
+import { BeerMugIcon } from './icons/BeerMugIcon';
+
+interface HeaderProps {
+  isWalletConnected: boolean;
+  userAddress: string | null;
+  onConnectWallet: () => void;
+  onDisconnectWallet: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ isWalletConnected, userAddress, onConnectWallet, onDisconnectWallet }) => {
+  return (
+    <header className="fixed top-0 left-0 right-0 bg-brand-surface/80 backdrop-blur-md border-b border-brand-secondary z-50">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center space-x-3">
+            <BeerMugIcon className="h-8 w-8 text-brand-primary" />
+            <span className="text-xl font-bold text-brand-text-primary">Cabac</span>
+          </div>
+          <ConnectWalletButton
+            isConnected={isWalletConnected}
+            address={userAddress}
+            onConnect={onConnectWallet}
+            onDisconnect={onDisconnectWallet}
+          />
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;
