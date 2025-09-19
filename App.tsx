@@ -1,11 +1,9 @@
 import React from 'react';
-// FIX: Changed import from 'wagmi' to '@wagmi/react' to avoid module resolution conflict with the local wagmi.ts file.
-import { useAccount } from '@wagmi/react';
+import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 
 const App: React.FC = () => {
-  // FIX: Used '=' for destructuring assignment instead of 'of'.
   const { isConnected } = useAccount();
 
   return (
