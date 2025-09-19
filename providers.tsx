@@ -13,7 +13,7 @@ if (!projectId) {
 
 const celoSepolia = {
   ...viemCeloSepolia,
-  iconUrl: 'https://celo.org/icons/logo.svg',
+  iconUrl: 'https://celoscan.io/assets/celo/images/svg/logos/token-light.svg',
 };
 
 const config = getDefaultConfig({
