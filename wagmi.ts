@@ -1,8 +1,7 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { sepolia, baseSepolia, celoSepolia } from 'wagmi/chains';
-
-// FIX: Removed 'export * from "wagmi"' to avoid a module name collision with this file.
-// Hooks and components should be imported directly from 'wagmi' package.
+// FIX: Re-export necessary hooks and components from 'wagmi' to resolve module shadowing.
+export { WagmiProvider, useAccount } from 'wagmi';
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
