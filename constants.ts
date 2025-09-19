@@ -2,7 +2,7 @@ import type { Token } from './types';
 import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 
 // Using a conventional address for native tokens
-const NATIVE_TOKEN_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+export const NATIVE_TOKEN_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
 export const TOKENS_BY_CHAIN: Record<number, Token[]> = {
   [sepolia.id]: [

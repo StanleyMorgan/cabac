@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
-import { TOKENS_BY_CHAIN } from '../constants';
+import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
 import TokenInput from './TokenInput';
 import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { useAccount, useBalance } from 'wagmi';
 import { sepolia } from 'viem/chains';
 
 interface SwapCardProps {
@@ -15,7 +15,7 @@ interface SwapCardProps {
 }
 
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
-    const { chainId } = useAccount();
+    const { address, chainId } = useAccount();
     const { openConnectModal } = useConnectModal();
 
     const availableTokens = useMemo(() => {
@@ -31,6 +31,21 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [slippage, setSlippage] = useState(0.5);
     const [mockExchangeRate, setMockExchangeRate] = useState(3000);
+
+    // Fetch balance for the input token
+    const { data: balanceIn, isLoading: isLoadingBalanceIn } = useBalance({
+        address: address,
+        token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`,
+        chainId: chainId,
+    });
+
+    // Fetch balance for the output token
+    const { data: balanceOut, isLoading: isLoadingBalanceOut } = useBalance({
+        address: address,
+        token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`,
+        chainId: chainId,
+    });
+
 
     useEffect(() => {
         if (availableTokens.length > 0) {
@@ -134,7 +149,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         amount={amountIn}
                         onAmountChange={setAmountIn}
                         onTokenSelect={() => setIsSelectingFor('in')}
-                        balance={10.5} // Mock balance
+                        balance={balanceIn?.formatted}
+                        isBalanceLoading={isLoadingBalanceIn}
                     />
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 my-[-12px] z-10">
                         <button onClick={handleSwapTokens} className="bg-brand-secondary hover:bg-brand-surface-2 rounded-full p-2 border-4 border-brand-surface transition-transform duration-300 ease-in-out hover:rotate-180">
@@ -147,7 +163,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         amount={amountOut}
                         onAmountChange={setAmountOut}
                         onTokenSelect={() => setIsSelectingFor('out')}
-                        balance={25000} // Mock balance
+                        balance={balanceOut?.formatted}
+                        isBalanceLoading={isLoadingBalanceOut}
                         isOutput={true}
                     />
                 </div>

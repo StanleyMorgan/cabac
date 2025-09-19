@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Token } from '../types';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
@@ -9,7 +8,8 @@ interface TokenInputProps {
   amount: string;
   onAmountChange: (amount: string) => void;
   onTokenSelect: () => void;
-  balance: number;
+  balance?: string;
+  isBalanceLoading: boolean;
   isOutput?: boolean;
 }
 
@@ -20,6 +20,7 @@ const TokenInput: React.FC<TokenInputProps> = ({
   onAmountChange,
   onTokenSelect,
   balance,
+  isBalanceLoading,
   isOutput = false
 }) => {
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,7 +35,13 @@ const TokenInput: React.FC<TokenInputProps> = ({
     <div className="bg-brand-surface-2 p-4 rounded-xl mb-1">
       <div className="flex justify-between items-center text-sm text-brand-text-secondary mb-2">
         <span>{label}</span>
-        <span>Balance: {balance.toFixed(2)}</span>
+        <span>
+            Balance: {isBalanceLoading ? (
+                <span className="inline-block w-16 h-4 bg-brand-secondary rounded animate-pulse ml-1 align-middle" />
+            ) : (
+                balance ? parseFloat(balance).toFixed(4) : '0.00'
+            )}
+        </span>
       </div>
       <div className="flex justify-between items-center">
         <input
