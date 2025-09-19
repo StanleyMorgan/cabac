@@ -1,12 +1,12 @@
 import '@rainbow-me/rainbowkit/styles.css';
 // FIX: Added getDefaultConfig to imports
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
-// FIX: This import will now correctly resolve to the wagmi package
-import { WagmiProvider } from 'wagmi';
+// FIX: Changed import from 'wagmi' to '@wagmi/react' to avoid module resolution conflict with local wagmi.ts file.
+import { WagmiProvider } from '@wagmi/react';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import React from 'react';
 // FIX: Added chains import for wagmi config
-import { mainnet, sepolia } from 'wagmi/chains';
+import { sepolia, baseSepolia, celoSepolia } from 'wagmi/chains';
 
 const queryClient = new QueryClient();
 
@@ -20,7 +20,7 @@ if (!projectId) {
 const config = getDefaultConfig({
   appName: 'Cabac DEX',
   projectId,
-  chains: [mainnet, sepolia],
+  chains: [sepolia, baseSepolia, celoSepolia],
   ssr: false, 
 });
 
