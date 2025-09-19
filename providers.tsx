@@ -2,8 +2,8 @@ import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import React from 'react';
-// FIX: Import WagmiProvider from 'wagmi' package and config from local wagmi file.
-import { WagmiProvider } from 'wagmi';
+// FIX: The `WagmiProvider` is not exported from 'wagmi', it needs to be imported from '@wagmi/react'.
+import { WagmiProvider } from '@wagmi/react';
 import { config } from './wagmi';
 
 const queryClient = new QueryClient();

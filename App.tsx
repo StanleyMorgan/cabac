@@ -1,6 +1,6 @@
 import React from 'react';
-// FIX: Import from 'wagmi' package directly to avoid module resolution conflicts.
-import { useAccount } from 'wagmi';
+// FIX: The `useAccount` hook is not exported from 'wagmi', it needs to be imported from '@wagmi/react'.
+import { useAccount } from '@wagmi/react';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 
