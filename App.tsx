@@ -1,6 +1,6 @@
 import React from 'react';
-// Fix: Import `useAccount` from '@wagmi/react' to resolve module export error.
-import { useAccount } from '@wagmi/react';
+// FIX: Update import to use the local wagmi.ts module to fix module resolution error.
+import { useAccount } from './wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 
