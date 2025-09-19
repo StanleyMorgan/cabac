@@ -1,24 +1,14 @@
 import '@rainbow-me/rainbowkit/styles.css';
-import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
+// FIX: Update imports to use the local wagmi.ts module.
+// FIX: Import `WagmiProvider` directly from 'wagmi' to avoid a module name collision with the local `wagmi.ts` file.
 import { WagmiProvider } from 'wagmi';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import React from 'react';
-import { sepolia, baseSepolia, celoSepolia } from 'wagmi/chains';
+// FIX: Import config from the new wagmi.ts module.
+import { config } from './wagmi';
 
 const queryClient = new QueryClient();
-
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
-
-if (!projectId) {
-  throw new Error("VITE_WALLETCONNECT_PROJECT_ID is not set in the environment variables.");
-}
-
-const config = getDefaultConfig({
-  appName: 'Cabac DEX',
-  projectId,
-  chains: [sepolia, baseSepolia, celoSepolia],
-  ssr: false, 
-});
 
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
   return (

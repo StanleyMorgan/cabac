@@ -1,4 +1,6 @@
 import React from 'react';
+// FIX: Update import to use the local wagmi.ts module.
+// FIX: Import `useAccount` directly from 'wagmi' to avoid a module name collision with the local `wagmi.ts` file.
 import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
