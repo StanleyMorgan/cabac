@@ -1,6 +1,6 @@
 import React from 'react';
-// FIX: Use a relative import for the local wagmi module to avoid module resolution conflicts.
-import { useAccount } from './wagmi';
+// FIX: Import from 'wagmi' package directly to avoid module resolution conflicts.
+import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 

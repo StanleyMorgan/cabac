@@ -1,7 +1,5 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { sepolia, baseSepolia, celoSepolia } from 'wagmi/chains';
-// FIX: Re-export necessary hooks and components from 'wagmi' to resolve module shadowing.
-export { WagmiProvider, useAccount } from 'wagmi';
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
