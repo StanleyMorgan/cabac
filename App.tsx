@@ -1,6 +1,5 @@
 import React from 'react';
-// FIX: Update import to use the local wagmi.ts module to fix module resolution error.
-import { useAccount } from './wagmi';
+import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 
