@@ -1,11 +1,11 @@
 import React from 'react';
-// FIX: Changed import for `useAccount` from `wagmi` to `@wagmi/react` to resolve module export error.
-import { useAccount } from '@wagmi/react';
+// FIX: Changed to a namespace import to fix module resolution issues.
+import * as wagmi from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 
 const App: React.FC = () => {
-  const { isConnected } = useAccount();
+  const { isConnected } = wagmi.useAccount();
 
   return (
     <div className="min-h-screen bg-brand-bg font-sans">
