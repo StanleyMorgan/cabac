@@ -1,27 +1,24 @@
 
 import React, { useState } from 'react';
 import type { Token } from '../types';
-import { TOKENS } from '../constants';
 import { CloseIcon } from './icons/CloseIcon';
 
 interface TokenSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectToken: (token: Token) => void;
-  currentTokenIn: Token;
-  currentTokenOut: Token;
+  tokens: Token[];
 }
 
 const TokenSelectorModal: React.FC<TokenSelectorModalProps> = ({
   isOpen,
   onClose,
   onSelectToken,
-  currentTokenIn,
-  currentTokenOut,
+  tokens,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredTokens = TOKENS.filter(
+  const filteredTokens = tokens.filter(
     (token) =>
       token.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       token.symbol.toLowerCase().includes(searchTerm.toLowerCase())
@@ -50,7 +47,7 @@ const TokenSelectorModal: React.FC<TokenSelectorModalProps> = ({
         <div className="flex-grow overflow-y-auto">
           <ul className="p-2">
             {filteredTokens.map((token) => (
-              <li key={token.symbol}>
+              <li key={token.address}>
                 <button
                   onClick={() => onSelectToken(token)}
                   className="w-full flex items-center p-3 hover:bg-brand-secondary rounded-lg transition-colors"

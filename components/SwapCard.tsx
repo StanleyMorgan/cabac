@@ -1,28 +1,48 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
-import { TOKENS } from '../constants';
+import { TOKENS_BY_CHAIN } from '../constants';
 import TokenInput from './TokenInput';
 import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
+import { sepolia } from 'viem/chains';
 
 interface SwapCardProps {
     isWalletConnected: boolean;
 }
 
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
-    const [tokenIn, setTokenIn] = useState<Token>(TOKENS[0]);
-    const [tokenOut, setTokenOut] = useState<Token>(TOKENS[2]);
+    const { chainId } = useAccount();
+    const { openConnectModal } = useConnectModal();
+
+    const availableTokens = useMemo(() => {
+        const currentChainId = chainId || sepolia.id; // Default to Sepolia
+        return TOKENS_BY_CHAIN[currentChainId] || [];
+    }, [chainId]);
+
+    const [tokenIn, setTokenIn] = useState<Token | null>(null);
+    const [tokenOut, setTokenOut] = useState<Token | null>(null);
     const [amountIn, setAmountIn] = useState('');
     const [amountOut, setAmountOut] = useState('');
     const [isSelectingFor, setIsSelectingFor] = useState<'in' | 'out' | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [slippage, setSlippage] = useState(0.5);
     const [mockExchangeRate, setMockExchangeRate] = useState(3000);
-    const { openConnectModal } = useConnectModal();
 
+    useEffect(() => {
+        if (availableTokens.length > 0) {
+            setTokenIn(availableTokens[0]);
+            setTokenOut(availableTokens.length > 1 ? availableTokens[1] : availableTokens[0]);
+        } else {
+            setTokenIn(null);
+            setTokenOut(null);
+        }
+        setAmountIn('');
+        setAmountOut('');
+    }, [availableTokens]);
 
     useEffect(() => {
         // Simulate fetching a new exchange rate when tokens change
@@ -40,12 +60,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const handleTokenSelect = useCallback((token: Token) => {
         if (isSelectingFor === 'in') {
-            if (token.symbol === tokenOut.symbol) {
+            if (token.symbol === tokenOut?.symbol) {
                 setTokenOut(tokenIn);
             }
             setTokenIn(token);
         } else if (isSelectingFor === 'out') {
-             if (token.symbol === tokenIn.symbol) {
+             if (token.symbol === tokenIn?.symbol) {
                 setTokenIn(tokenOut);
             }
             setTokenOut(token);
@@ -68,7 +88,33 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, [tokenIn, tokenOut, amountOut, mockExchangeRate]);
     
     const handleSwap = () => {
+        if (!tokenIn || !tokenOut) return;
         alert(`Swapping ${amountIn} ${tokenIn.symbol} for ~${amountOut} ${tokenOut.symbol} with ${slippage}% slippage.\n(This is a simulation)`);
+    }
+
+    if (availableTokens.length === 0 && isWalletConnected) {
+        return (
+            <div className="w-full max-w-md bg-brand-surface rounded-2xl p-6 shadow-2xl border border-brand-secondary text-center">
+                <h2 className="text-xl font-bold mb-4">Swap</h2>
+                <p className="text-brand-text-secondary">
+                    This network is not supported.
+                </p>
+            </div>
+        );
+    }
+    
+    if (!tokenIn || !tokenOut) {
+       return (
+          <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary animate-pulse">
+              <div className="flex justify-between items-center mb-4">
+                  <div className="h-7 bg-brand-surface-2 rounded w-1/4"></div>
+                  <div className="h-7 w-7 bg-brand-surface-2 rounded-full"></div>
+              </div>
+              <div className="h-28 bg-brand-surface-2 rounded-xl mb-1"></div>
+              <div className="h-28 bg-brand-surface-2 rounded-xl"></div>
+              <div className="h-12 bg-brand-surface-2 rounded-xl mt-4"></div>
+          </div>
+      );
     }
 
     return (
@@ -133,8 +179,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     isOpen={!!isSelectingFor}
                     onClose={() => setIsSelectingFor(null)}
                     onSelectToken={handleTokenSelect}
-                    currentTokenIn={tokenIn}
-                    currentTokenOut={tokenOut}
+                    tokens={availableTokens}
                 />
             )}
             {isSettingsOpen && (
