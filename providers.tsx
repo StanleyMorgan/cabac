@@ -3,13 +3,18 @@ import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { WagmiProvider } from 'wagmi';
-import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
+import { sepolia, baseSepolia, celoSepolia as viemCeloSepolia } from 'viem/chains';
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
 if (!projectId) {
   throw new Error("VITE_WALLETCONNECT_PROJECT_ID is not set");
 }
+
+const celoSepolia = {
+  ...viemCeloSepolia,
+  iconUrl: 'https://celo.org/icons/logo.svg',
+};
 
 const config = getDefaultConfig({
   appName: 'Cabac DEX',
