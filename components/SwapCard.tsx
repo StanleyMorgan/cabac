@@ -110,30 +110,34 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
         args: swapArgs ? [swapArgs] : undefined,
-        // FIX: Include value in simulation for native token swaps to ensure correct request preparation.
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
         query: {
             enabled: amountInBigInt > 0 && !!swapArgs && !isApprovalNeeded,
         },
     });
     
+    // FIX: Split complex useEffect into two to handle a potential type inference issue.
+    // This effect updates the quote and minimum amount out.
     useEffect(() => {
-        if (amountInBigInt > 0 && tokenIn && tokenOut) {
-            if (quoteResult?.result) {
-                const quoteAmount = quoteResult.result as bigint;
-                const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
-                setAmountOut(formattedAmount);
-                // Calculate minimum amount out based on slippage
-                const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
-                if(newAmountOutMinimum !== amountOutMinimum) {
-                    setAmountOutMinimum(newAmountOutMinimum);
-                }
+        if (amountInBigInt > 0 && tokenIn && tokenOut && quoteResult?.result) {
+            const quoteAmount = quoteResult.result as bigint;
+            const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
+            setAmountOut(formattedAmount);
+            // Calculate minimum amount out based on slippage
+            const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
+            if (newAmountOutMinimum !== amountOutMinimum) {
+                setAmountOutMinimum(newAmountOutMinimum);
             }
-        } else {
+        }
+    }, [quoteResult?.result, amountInBigInt, tokenIn, tokenOut, slippage, amountOutMinimum]);
+
+    // This effect handles clearing the output when the input is cleared.
+    useEffect(() => {
+        if (amountInBigInt <= 0) {
             setAmountOut('');
             setAmountOutMinimum(0n);
         }
-    }, [quoteResult?.result, amountInBigInt, tokenIn, tokenOut, slippage, amountOutMinimum]);
+    }, [amountInBigInt]);
     
     // This effect ensures we get a new quote if slippage changes
     useEffect(() => {
@@ -190,11 +194,16 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     };
     
     const handleSwap = async () => {
-        if (!quoteResult?.request) return;
+        // FIX: Reconstruct params to ensure type correctness, as useSimulateContract's prepared request type is too broad.
+        if (!swapArgs || !contracts?.ROUTER || !tokenIn) return;
         try {
-            // FIX: Pass the prepared request from useSimulateContract directly.
-            // The `value` is now correctly included in the request.
-            await writeContractAsync(quoteResult.request);
+            await writeContractAsync({
+                address: contracts.ROUTER,
+                abi: ROUTER_ABI,
+                functionName: 'exactInputSingle',
+                args: [swapArgs],
+                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : 0n,
+            });
         } catch (error) {
             console.error("Swap failed:", error);
         }
