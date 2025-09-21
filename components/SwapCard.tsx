@@ -21,12 +21,16 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { address, chainId } = useAccount();
     const { openConnectModal } = useConnectModal();
 
-    const isSupportedChain = useMemo(() => chainId === baseSepolia.id, [chainId]);
+    const isSupportedChain = useMemo(() => {
+        if (!chainId) return false;
+        return !!TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN];
+    }, [chainId]);
+
     const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
 
     const availableTokens = useMemo(() => {
-        const currentChainId = chainId || baseSepolia.id;
-        return TOKENS_BY_CHAIN[currentChainId] || [];
+        if (!chainId) return []; // Don't assume a chain, wait for wagmi to provide it.
+        return TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN] || [];
     }, [chainId]);
 
     const [tokenIn, setTokenIn] = useState<Token | null>(null);
@@ -77,7 +81,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [contracts?.ROUTER, maxUint256],
+        // FIX: Ensure args are not undefined when the hook is type-checked, even if disabled.
+        args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
         },
@@ -144,7 +149,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [isTxSuccess, reset, refetchAllowance]);
 
-    // FIX: Simulate contract call for the swap to get validated request arguments for writeContractAsync
     const swapArgs = useMemo(() => {
         if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n) return undefined;
         return {
@@ -197,7 +201,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     };
     
-    // FIX: Use the result from useSimulateContract to call writeContractAsync
     const handleSwap = async () => {
         if (!swapResult?.request) return;
         try {
@@ -217,7 +220,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         return 'Swap';
     };
 
-    if (!isWalletConnected && availableTokens.length === 0) {
+    if (!isWalletConnected) {
         return (
              <div className="w-full max-w-md bg-brand-surface rounded-2xl p-6 shadow-2xl border border-brand-secondary text-center">
                 <h2 className="text-xl font-bold mb-4">Swap</h2>
@@ -298,7 +301,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
                 <button
                     onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    // FIX: Also disable button if swap simulation is not ready
                     disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request))}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
