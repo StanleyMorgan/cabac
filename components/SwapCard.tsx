@@ -37,8 +37,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [slippage, setSlippage] = useState(0.5);
     const [amountOutMinimum, setAmountOutMinimum] = useState(0n);
-
-    const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     const [isApprovalNeeded, setIsApprovalNeeded] = useState(false);
 
     const debouncedAmountIn = useDebounce(amountIn, 500);
@@ -53,11 +51,9 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { data: balanceIn } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
     const { data: balanceOut } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
 
-    // State for transactions
     const { writeContractAsync, data: txHash, isPending: isTxPending, reset } = useWriteContract();
     const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-    // Check allowance
     const { data: allowance, refetch: refetchAllowance } = useReadContract({
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
@@ -77,7 +73,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [allowance, amountInBigInt, tokenIn]);
 
-    // Simulate approve transaction
     const { data: approveResult } = useSimulateContract({
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
@@ -88,10 +83,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         },
     });
 
-    // Prepare swap arguments safely
-    const swapArgs = useMemo(() => {
-        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH) return undefined;
-        
+    const quoteArgs = useMemo(() => {
+        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0) return undefined;
         return {
             tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
             tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
@@ -99,39 +92,32 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             recipient: address,
             deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             amountIn: amountInBigInt,
-            amountOutMinimum: amountOutMinimum,
+            amountOutMinimum: 0n, // Use 0 for quoting to prevent dependency cycles
             sqrtPriceLimitX96: 0n,
         };
-    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
+    }, [tokenIn, tokenOut, address, contracts, amountInBigInt]);
 
-    // Simulate swap transaction to get quote and prepare the transaction
-    const { data: quoteResult, refetch: refetchQuote } = useSimulateContract({
+    const { data: quoteResult, isLoading: isQuoteLoading } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
-        args: swapArgs ? [swapArgs] : undefined,
+        args: quoteArgs ? [quoteArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
         query: {
-            enabled: amountInBigInt > 0 && !!swapArgs && !isApprovalNeeded,
+            enabled: !!quoteArgs && !isApprovalNeeded,
         },
     });
-    
-    // FIX: Split complex useEffect into two to handle a potential type inference issue.
-    // This effect updates the quote and minimum amount out.
+
     useEffect(() => {
-        if (amountInBigInt > 0 && tokenIn && tokenOut && quoteResult?.result) {
+        if (quoteResult?.result && tokenOut) {
             const quoteAmount = quoteResult.result as bigint;
             const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
             setAmountOut(formattedAmount);
-            // Calculate minimum amount out based on slippage
             const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
-            if (newAmountOutMinimum !== amountOutMinimum) {
-                setAmountOutMinimum(newAmountOutMinimum);
-            }
+            setAmountOutMinimum(newAmountOutMinimum);
         }
-    }, [quoteResult?.result, amountInBigInt, tokenIn, tokenOut, slippage, amountOutMinimum]);
+    }, [quoteResult?.result, tokenOut, slippage]);
 
-    // This effect handles clearing the output when the input is cleared.
     useEffect(() => {
         if (amountInBigInt <= 0) {
             setAmountOut('');
@@ -139,14 +125,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [amountInBigInt]);
     
-    // This effect ensures we get a new quote if slippage changes
-    useEffect(() => {
-        if(amountInBigInt > 0 && swapArgs) {
-            refetchQuote();
-        }
-    }, [amountOutMinimum, refetchQuote, amountInBigInt, swapArgs]);
-
-
     useEffect(() => {
         if (availableTokens.length > 0) {
             setTokenIn(availableTokens[0]);
@@ -165,6 +143,32 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             reset();
         }
     }, [isTxSuccess, reset, refetchAllowance]);
+
+    // FIX: Simulate contract call for the swap to get validated request arguments for writeContractAsync
+    const swapArgs = useMemo(() => {
+        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n) return undefined;
+        return {
+            tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
+            tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
+            fee: 3000,
+            recipient: address,
+            deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+            amountIn: amountInBigInt,
+            amountOutMinimum: amountOutMinimum,
+            sqrtPriceLimitX96: 0n,
+        };
+    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
+
+    const { data: swapResult } = useSimulateContract({
+        address: contracts?.ROUTER,
+        abi: ROUTER_ABI,
+        functionName: 'exactInputSingle',
+        args: swapArgs ? [swapArgs] : undefined,
+        value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
+        query: {
+            enabled: !!swapArgs && !isApprovalNeeded,
+        },
+    });
 
     const handleTokenSelect = useCallback((token: Token) => {
         if (isSelectingFor === 'in') {
@@ -193,17 +197,11 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     };
     
+    // FIX: Use the result from useSimulateContract to call writeContractAsync
     const handleSwap = async () => {
-        // FIX: Reconstruct params to ensure type correctness, as useSimulateContract's prepared request type is too broad.
-        if (!swapArgs || !contracts?.ROUTER || !tokenIn) return;
+        if (!swapResult?.request) return;
         try {
-            await writeContractAsync({
-                address: contracts.ROUTER,
-                abi: ROUTER_ABI,
-                functionName: 'exactInputSingle',
-                args: [swapArgs],
-                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : 0n,
-            });
+            await writeContractAsync(swapResult.request);
         } catch (error) {
             console.error("Swap failed:", error);
         }
@@ -300,7 +298,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
                 <button
                     onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0))}
+                    // FIX: Also disable button if swap simulation is not ready
+                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request))}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
                     {getButtonText()}
