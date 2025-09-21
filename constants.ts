@@ -1,104 +1,69 @@
-import type { Token, Pool } from './types';
-import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
+import { Token, Pool } from './types';
+import { sepolia, baseSepolia } from 'viem/chains';
 
-// Using a conventional address for native tokens
-export const NATIVE_TOKEN_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+// A commonly used placeholder for native currency
+export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
-export const TOKENS_BY_CHAIN: Record<number, Token[]> = {
-  [sepolia.id]: [
-    {
-      symbol: 'ETH',
-      name: 'Ethereum',
-      logoURI: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
-      address: NATIVE_TOKEN_ADDRESS,
-      decimals: 18,
-    },
-    {
-      symbol: 'USDT',
-      name: 'Tether USD',
-      logoURI: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
-      address: '0xbC16b56f944ebF92DE3fDAc1a7E025a6107b8F5E',
-      decimals: 18,
-    },
-    {
-      symbol: 'USDC',
-      name: 'USD Coin',
-      logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png',
-      address: '0xc3308336731a6b257957567F43cF233679511a7D',
-      decimals: 18,
-    },
-  ],
-  [baseSepolia.id]: [
-    {
-      symbol: 'ETH',
-      name: 'Ethereum',
-      logoURI: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
-      address: NATIVE_TOKEN_ADDRESS,
-      decimals: 18,
-    },
-     {
-      symbol: 'USDC',
-      name: 'USD Coin',
-      logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png',
-      address: '0x3BF92B07DB657f5853d054d38fA24Bd654827437',
-      decimals: 18,
-    },
-    {
-      symbol: 'USDT',
-      name: 'Tether USD',
-      logoURI: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
-      address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9',
-      decimals: 18,
-    },
-  ],
-  [celoSepolia.id]: [
-    {
-      symbol: 'CELO',
-      name: 'Celo',
-      logoURI: 'https://assets.coingecko.com/coins/images/11090/large/icon-celo-CELO-color-500.png',
-      address: NATIVE_TOKEN_ADDRESS,
-      decimals: 18,
-    },
-     {
-      symbol: 'USDC',
-      name: 'USD Coin (Axelar)',
-      logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png',
-      address: '0x38b5224979104e351976A446B295773919621C11',
-      decimals: 18,
-    },
-    {
-      symbol: 'USDT',
-      name: 'Tether USD (Wormhole)',
-      logoURI: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
-      address: '0x486AB02e4f32611b3a8BA1febE9ce5A25Ed1b6b1',
-      decimals: 18,
-    },
-  ],
+const WETH_SEPOLIA: Token = {
+    address: '0x7b79995e5f793A07Bc00c21412e50Eaae098E7f9',
+    symbol: 'WETH',
+    name: 'Wrapped Ether',
+    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+    decimals: 18,
 };
 
+const USDC_SEPOLIA: Token = {
+    address: '0x94a9D9AC8a22534E3FaCa4E4343A411334533C6E',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    decimals: 6,
+};
 
-const baseSepoliaTokens = TOKENS_BY_CHAIN[baseSepolia.id];
-const baseSepoliaUsdc = baseSepoliaTokens.find(t => t.symbol === 'USDC');
-const baseSepoliaUsdt = baseSepoliaTokens.find(t => t.symbol === 'USDT');
+const WETH_BASE_SEPOLIA: Token = {
+    address: '0x4200000000000000000000000000000000000006',
+    symbol: 'WETH',
+    name: 'Wrapped Ether',
+    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+    decimals: 18,
+};
 
-// Uniswap V3 requires token0 to be the token with the lower address
-let token0: Token | undefined, token1: Token | undefined;
-if (baseSepoliaUsdc && baseSepoliaUsdt) {
-    if (baseSepoliaUsdc.address.toLowerCase() < baseSepoliaUsdt.address.toLowerCase()) {
-        token0 = baseSepoliaUsdc;
-        token1 = baseSepoliaUsdt;
-    } else {
-        token0 = baseSepoliaUsdt;
-        token1 = baseSepoliaUsdc;
-    }
-}
+const USDC_BASE_SEPOLIA: Token = {
+    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    decimals: 6,
+};
 
-export const POOLS_BY_CHAIN: Record<number, Pool[]> = {
-  [baseSepolia.id]: (token0 && token1) ? [
-    {
-      address: '0xDA84d2f810f682fb392CA1126CAe7462542B0903',
-      token0: token0,
-      token1: token1,
-    },
-  ] : [],
+export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
+    [sepolia.id]: [
+        WETH_SEPOLIA,
+        USDC_SEPOLIA,
+    ],
+    [baseSepolia.id]: [
+        WETH_BASE_SEPOLIA,
+        USDC_BASE_SEPOLIA,
+    ]
+};
+
+const POOL_WETH_USDC_SEPOLIA: Pool = {
+    address: '0x7a43793A32aF1550a43054135285786b4374352a', // Placeholder
+    token0: WETH_SEPOLIA,
+    token1: USDC_SEPOLIA,
+};
+
+const POOL_WETH_USDC_BASE_SEPOLIA: Pool = {
+    address: '0x33593f2f458d655f6533d61b58b47e8e7b7f293e', // Placeholder
+    token0: WETH_BASE_SEPOLIA,
+    token1: USDC_BASE_SEPOLIA,
+};
+
+export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
+    [sepolia.id]: [
+        POOL_WETH_USDC_SEPOLIA
+    ],
+    [baseSepolia.id]: [
+        POOL_WETH_USDC_BASE_SEPOLIA
+    ]
 };

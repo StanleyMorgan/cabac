@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Pool } from '../types';
 import { ExternalLinkIcon } from './icons/ExternalLinkIcon';
-import { useAccount } from 'wagmi';
 
 interface PoolListItemProps {
   pool: Pool;
@@ -9,41 +8,32 @@ interface PoolListItemProps {
 }
 
 const PoolListItem: React.FC<PoolListItemProps> = ({ pool, onSelect }) => {
-  const { chain } = useAccount();
-  const explorerUrl = chain?.blockExplorers?.default.url;
+  const { token0, token1 } = pool;
 
   return (
-    <li>
-      <div className="w-full flex items-center justify-between p-3 hover:bg-brand-secondary rounded-lg transition-colors group">
+    <li className="mb-2">
+      <div className="flex items-center justify-between p-3 bg-brand-surface-2 rounded-lg">
         <div className="flex items-center">
           <div className="flex -space-x-2 mr-3">
-            <img src={pool.token0.logoURI} alt={pool.token0.name} className="w-8 h-8 rounded-full border-2 border-brand-surface" />
-            <img src={pool.token1.logoURI} alt={pool.token1.name} className="w-8 h-8 rounded-full border-2 border-brand-surface" />
+            <img src={token0.logoURI} alt={token0.name} className="w-7 h-7 rounded-full border-2 border-brand-surface-2" />
+            <img src={token1.logoURI} alt={token1.name} className="w-7 h-7 rounded-full border-2 border-brand-surface-2" />
           </div>
           <div>
-            <div className="font-bold text-left">{pool.token0.symbol}/{pool.token1.symbol}</div>
-            <div className="text-sm text-brand-text-secondary text-left flex items-center">
-              Uniswap V3
-              {explorerUrl && (
-                <a
-                  href={`${explorerUrl}/address/${pool.address}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-2 text-brand-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLinkIcon className="w-4 h-4" />
-                </a>
-              )}
-            </div>
+            <div className="font-bold">{token0.symbol} / {token1.symbol}</div>
+            <div className="text-sm text-brand-text-secondary">Uniswap V3</div>
           </div>
         </div>
-        <button
-          onClick={() => onSelect(pool)}
-          className="bg-brand-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-brand-primary-hover transition-colors"
-        >
-          Add Liquidity
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+              onClick={() => onSelect(pool)}
+              className="px-4 py-2 bg-brand-primary text-white text-sm font-semibold rounded-lg hover:bg-brand-primary-hover transition-colors"
+          >
+              Add Liquidity
+          </button>
+          <a href={`https://app.uniswap.org/pools/${pool.address}`} target="_blank" rel="noopener noreferrer" className="text-brand-text-secondary hover:text-brand-text-primary">
+            <ExternalLinkIcon className="w-5 h-5" />
+          </a>
+        </div>
       </div>
     </li>
   );
