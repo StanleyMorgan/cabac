@@ -1,14 +1,19 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
+import { ROUTER_ABI, ERC20_ABI, CONTRACT_ADDRESSES } from '../config';
+import { useDebounce } from '../hooks/useDebounce';
 import TokenInput from './TokenInput';
 import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance } from 'wagmi';
-import { sepolia } from 'viem/chains';
+import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
+import { baseSepolia } from 'viem/chains';
+import { parseUnits, formatUnits, maxUint256 } from 'viem';
 
 interface SwapCardProps {
     isWalletConnected: boolean;
@@ -18,8 +23,11 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { address, chainId } = useAccount();
     const { openConnectModal } = useConnectModal();
 
+    const isSupportedChain = useMemo(() => chainId === baseSepolia.id, [chainId]);
+    const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
+
     const availableTokens = useMemo(() => {
-        const currentChainId = chainId || sepolia.id; // Default to Sepolia
+        const currentChainId = chainId || baseSepolia.id;
         return TOKENS_BY_CHAIN[currentChainId] || [];
     }, [chainId]);
 
@@ -30,21 +38,98 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [isSelectingFor, setIsSelectingFor] = useState<'in' | 'out' | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [slippage, setSlippage] = useState(0.5);
-    const [mockExchangeRate, setMockExchangeRate] = useState(3000);
+    const [amountOutMinimum, setAmountOutMinimum] = useState(0n);
 
-    // Fetch balance for the input token
-    const { data: balanceIn, isLoading: isLoadingBalanceIn } = useBalance({
-        address: address,
-        token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`,
+    const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+    const [isApprovalNeeded, setIsApprovalNeeded] = useState(false);
+
+    const debouncedAmountIn = useDebounce(amountIn, 500);
+    const amountInBigInt = useMemo(() => {
+        try {
+            return debouncedAmountIn && tokenIn ? parseUnits(debouncedAmountIn, tokenIn.decimals) : 0n;
+        } catch {
+            return 0n;
+        }
+    }, [debouncedAmountIn, tokenIn]);
+
+    const { data: balanceIn } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
+    const { data: balanceOut } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
+
+    // State for transactions
+    const { writeContractAsync, data: txHash, isPending: isTxPending, reset } = useWriteContract();
+    const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+    // Check allowance
+    const { data: allowance, refetch: refetchAllowance } = useReadContract({
+        abi: ERC20_ABI,
+        address: tokenIn?.address as `0x${string}`,
+        functionName: 'allowance',
+        args: [address!, contracts?.ROUTER!],
         chainId: chainId,
+        query: {
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts,
+        },
     });
 
-    // Fetch balance for the output token
-    const { data: balanceOut, isLoading: isLoadingBalanceOut } = useBalance({
-        address: address,
-        token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`,
-        chainId: chainId,
+    useEffect(() => {
+        if (tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && allowance !== undefined && amountInBigInt > 0) {
+            setIsApprovalNeeded(allowance < amountInBigInt);
+        } else {
+            setIsApprovalNeeded(false);
+        }
+    }, [allowance, amountInBigInt, tokenIn]);
+
+    // FIX: Simulate approve transaction
+    const { data: approveResult } = useSimulateContract({
+        address: tokenIn?.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [contracts?.ROUTER!, maxUint256],
+        query: {
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts && isApprovalNeeded,
+        },
     });
+
+    // FIX: Simulate swap transaction to get quote and prepare the transaction
+    const { data: quoteResult } = useSimulateContract({
+        address: contracts?.ROUTER,
+        abi: ROUTER_ABI,
+        functionName: 'exactInputSingle',
+        args: [
+            {
+                tokenIn: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH! : tokenIn?.address as `0x${string}`,
+                tokenOut: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH! : tokenOut?.address as `0x${string}`,
+                fee: 3000, // Common 0.3% fee tier
+                recipient: address!,
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+                amountIn: amountInBigInt,
+                amountOutMinimum: amountOutMinimum,
+                sqrtPriceLimitX96: 0n,
+            },
+        ],
+        query: {
+            enabled: amountInBigInt > 0 && !!tokenIn && !!tokenOut && !!address && !!contracts && !isApprovalNeeded,
+        },
+    });
+
+    useEffect(() => {
+        if (amountInBigInt > 0 && tokenIn && tokenOut) {
+            if (quoteResult?.result) {
+                setIsQuoteLoading(true);
+                const quoteAmount = quoteResult.result as bigint;
+                const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
+                setAmountOut(formattedAmount);
+                const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
+                if(newAmountOutMinimum !== amountOutMinimum) {
+                    setAmountOutMinimum(newAmountOutMinimum);
+                }
+                setIsQuoteLoading(false);
+            }
+        } else {
+            setAmountOut('');
+            setAmountOutMinimum(0n);
+        }
+    }, [quoteResult?.result, amountInBigInt, tokenIn, tokenOut, slippage, amountOutMinimum]);
 
 
     useEffect(() => {
@@ -59,30 +144,19 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountOut('');
     }, [availableTokens]);
 
-    useEffect(() => {
-        // Simulate fetching a new exchange rate when tokens change
-        setMockExchangeRate(Math.random() * 5000 + 1000); 
-    }, [tokenIn, tokenOut]);
-
-    useEffect(() => {
-        if (amountIn && parseFloat(amountIn) > 0) {
-            const calculatedAmountOut = parseFloat(amountIn) * mockExchangeRate;
-            setAmountOut(calculatedAmountOut.toFixed(4));
-        } else {
-            setAmountOut('');
+     useEffect(() => {
+        if (isTxSuccess) {
+            refetchAllowance();
+            reset();
         }
-    }, [amountIn, mockExchangeRate]);
+    }, [isTxSuccess, reset, refetchAllowance]);
 
     const handleTokenSelect = useCallback((token: Token) => {
         if (isSelectingFor === 'in') {
-            if (token.symbol === tokenOut?.symbol) {
-                setTokenOut(tokenIn);
-            }
+            if (token.symbol === tokenOut?.symbol) setTokenOut(tokenIn);
             setTokenIn(token);
         } else if (isSelectingFor === 'out') {
-             if (token.symbol === tokenIn?.symbol) {
-                setTokenIn(tokenOut);
-            }
+             if (token.symbol === tokenIn?.symbol) setTokenIn(tokenOut);
             setTokenOut(token);
         }
         setIsSelectingFor(null);
@@ -92,32 +166,56 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setTokenIn(tokenOut);
         setTokenOut(tokenIn);
         setAmountIn(amountOut);
-        // Recalculate based on new direction
-        if (amountOut && parseFloat(amountOut) > 0) {
-            const calculatedAmountIn = parseFloat(amountOut) / mockExchangeRate;
-            setAmountOut(calculatedAmountIn.toFixed(4));
-        } else {
-             setAmountOut('');
+        setAmountOut(amountIn);
+    }, [tokenIn, tokenOut, amountIn, amountOut]);
+    
+    // FIX: Use prepared request from useSimulateContract for approve
+    const handleApprove = async () => {
+        if (!approveResult?.request) return;
+        try {
+            await writeContractAsync(approveResult.request);
+        } catch (error) {
+            console.error("Approval failed:", error);
+            // Add user feedback here
         }
-
-    }, [tokenIn, tokenOut, amountOut, mockExchangeRate]);
+    };
     
-    const handleSwap = () => {
-        if (!tokenIn || !tokenOut) return;
-        alert(`Swapping ${amountIn} ${tokenIn.symbol} for ~${amountOut} ${tokenOut.symbol} with ${slippage}% slippage.\n(This is a simulation)`);
+    // FIX: Use prepared request from useSimulateContract for swap
+    const handleSwap = async () => {
+        if (!quoteResult?.request) return;
+        try {
+            const isNativeIn = tokenIn?.address === NATIVE_TOKEN_ADDRESS;
+            await writeContractAsync({
+                ...quoteResult.request,
+                value: isNativeIn ? amountInBigInt : 0n,
+            });
+        } catch (error) {
+            console.error("Swap failed:", error);
+            // Add user feedback here
+        }
     }
 
-    if (availableTokens.length === 0 && isWalletConnected) {
+    const getButtonText = () => {
+        if (!isWalletConnected) return 'Connect Wallet';
+        if (!isSupportedChain) return 'Unsupported Network';
+        if (isTxPending) return 'Check Wallet...';
+        if (isTxConfirming) return 'Transaction Confirming...';
+        if (isApprovalNeeded) return `Approve ${tokenIn?.symbol}`;
+        if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter an amount';
+        return 'Swap';
+    };
+
+    if (!isWalletConnected && availableTokens.length === 0) {
         return (
-            <div className="w-full max-w-md bg-brand-surface rounded-2xl p-6 shadow-2xl border border-brand-secondary text-center">
+             <div className="w-full max-w-md bg-brand-surface rounded-2xl p-6 shadow-2xl border border-brand-secondary text-center">
                 <h2 className="text-xl font-bold mb-4">Swap</h2>
-                <p className="text-brand-text-secondary">
-                    This network is not supported.
-                </p>
+                 <button onClick={openConnectModal} className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover transition-all mt-4">
+                    Connect Wallet
+                 </button>
             </div>
-        );
+        )
     }
-    
+
     if (!tokenIn || !tokenOut) {
        return (
           <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary animate-pulse">
@@ -131,6 +229,15 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
           </div>
       );
     }
+    
+    const exchangeRate = useMemo(() => {
+        const numAmountIn = parseFloat(amountIn);
+        const numAmountOut = parseFloat(amountOut);
+        if (numAmountIn > 0 && numAmountOut > 0) {
+            return (numAmountOut / numAmountIn).toFixed(4);
+        }
+        return '...';
+    }, [amountIn, amountOut]);
 
     return (
         <>
@@ -150,7 +257,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         onAmountChange={setAmountIn}
                         onTokenSelect={() => setIsSelectingFor('in')}
                         balance={balanceIn?.formatted}
-                        isBalanceLoading={isLoadingBalanceIn}
+                        isBalanceLoading={!balanceIn}
                     />
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 my-[-12px] z-10">
                         <button onClick={handleSwapTokens} className="bg-brand-secondary hover:bg-brand-surface-2 rounded-full p-2 border-4 border-brand-surface transition-transform duration-300 ease-in-out hover:rotate-180">
@@ -161,34 +268,29 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         label="You receive"
                         token={tokenOut}
                         amount={amountOut}
-                        onAmountChange={setAmountOut}
+                        onAmountChange={() => {}}
                         onTokenSelect={() => setIsSelectingFor('out')}
                         balance={balanceOut?.formatted}
-                        isBalanceLoading={isLoadingBalanceOut}
+                        isBalanceLoading={!balanceOut}
                         isOutput={true}
                     />
                 </div>
 
-                 <div className="text-sm text-brand-text-secondary p-2 text-center">
-                    1 {tokenIn.symbol} ≈ {mockExchangeRate.toFixed(2)} {tokenOut.symbol}
+                <div className="text-sm text-brand-text-secondary p-2 text-center h-6">
+                   {isQuoteLoading ? (
+                        <span className="inline-block w-48 h-4 bg-brand-surface-2 rounded animate-pulse align-middle" />
+                   ) : (
+                     amountIn && parseFloat(amountIn) > 0 && amountOut && `1 ${tokenIn.symbol} ≈ ${exchangeRate} ${tokenOut.symbol}`
+                   )}
                 </div>
 
-                {isWalletConnected ? (
-                     <button
-                        onClick={handleSwap}
-                        disabled={!amountIn || parseFloat(amountIn) <= 0}
-                        className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
-                     >
-                        Swap
-                     </button>
-                ) : (
-                    <button
-                        onClick={openConnectModal}
-                        className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover transition-all mt-4"
-                     >
-                        Connect Wallet
-                     </button>
-                )}
+                <button
+                    onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
+                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0))}
+                    className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
+                >
+                    {getButtonText()}
+                </button>
             </div>
 
             {isSelectingFor && (
