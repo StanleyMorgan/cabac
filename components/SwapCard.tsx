@@ -10,7 +10,6 @@ import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
-import { baseSepolia } from 'viem/chains';
 import { parseUnits, formatUnits, maxUint256 } from 'viem';
 
 interface SwapCardProps {
@@ -31,7 +30,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
 
     const availableTokens = useMemo(() => {
-        if (!isSupportedChain || !chainId) return []; // Only return tokens for fully supported chains
+        if (!isSupportedChain || !chainId) return [];
         return TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN] || [];
     }, [chainId, isSupportedChain]);
 
@@ -98,7 +97,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             recipient: address,
             deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             amountIn: amountInBigInt,
-            amountOutMinimum: 0n, // Use 0 for quoting to prevent dependency cycles
+            amountOutMinimum: 0n,
             sqrtPriceLimitX96: 0n,
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt]);
@@ -113,21 +112,19 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             enabled: !!quoteArgs && !isApprovalNeeded,
         },
     });
-
+    
     useEffect(() => {
-        if (!quoteResult || !tokenOut) {
-            return;
-        }
-        
-        const quoteAmount = quoteResult.result;
-
-        if (typeof quoteAmount === 'bigint' && quoteAmount > 0n) {
-            const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
-            setAmountOut(formattedAmount);
-            const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
-            setAmountOutMinimum(newAmountOutMinimum);
+        if (quoteResult && tokenOut) {
+            const quoteAmount = quoteResult.result;
+            if (typeof quoteAmount === 'bigint' && quoteAmount > 0n) {
+                const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
+                setAmountOut(formattedAmount);
+                const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
+                setAmountOutMinimum(newAmountOutMinimum);
+            }
         }
     }, [quoteResult, tokenOut, slippage]);
+
 
     useEffect(() => {
         if (amountInBigInt <= 0n) {
@@ -150,7 +147,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
      useEffect(() => {
         if (isTxSuccess) {
-            // FIX: Prefix with 'void' to explicitly ignore the returned promise.
             void refetchAllowance();
             reset();
         }
@@ -199,25 +195,21 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountOut(amountIn);
     }, [tokenIn, tokenOut, amountIn, amountOut]);
     
+    // Fix: Correctly use the `request` object from `useSimulateContract` with `writeContractAsync`.
     const handleApprove = async () => {
-        // FIX: Changed guard clause to check for approveResult object existence first to help with type inference.
-        if (!approveResult) return;
-        // FIX: Destructure request from approveResult to help with TypeScript type inference.
-        const { request } = approveResult;
+        if (!approveResult?.request) return;
         try {
-            await writeContractAsync(request);
+            await writeContractAsync(approveResult.request);
         } catch (error) {
             console.error("Approval failed:", error);
         }
     };
     
+    // Fix: Correctly use the `request` object from `useSimulateContract` with `writeContractAsync`.
     const handleSwap = async () => {
-        // FIX: Changed guard clause to check for swapResult object existence first to help with type inference.
-        if (!swapResult) return;
-        // FIX: Destructure request from swapResult to help with TypeScript type inference.
-        const { request } = swapResult;
+        if (!swapResult?.request) return;
         try {
-            await writeContractAsync(request);
+             await writeContractAsync(swapResult.request);
         } catch (error) {
             console.error("Swap failed:", error);
         }
@@ -323,7 +315,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
                 <button
                     onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request))}
+                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
                     {getButtonText()}
