@@ -49,7 +49,7 @@ const WETH_BASE_SEPOLIA: Token = {
 };
 
 const USDC_BASE_SEPOLIA: Token = {
-    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    address: '0x3BF92B07DB657f5853d054d38fA24Bd654827437',
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
@@ -57,7 +57,7 @@ const USDC_BASE_SEPOLIA: Token = {
 };
 
 const USDT_BASE_SEPOLIA: Token = {
-    address: '0x718f3b207a75a2a537151a70438153a81a7d1a2d',
+    address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9',
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
@@ -89,8 +89,8 @@ const POOL_WETH_USDC_SEPOLIA: Pool = {
 const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     address: '0xDA84d2f810f682fb392CA1126CAe7462542B0903',
     // token0 must be the token with the smaller address
-    token0: USDC_BASE_SEPOLIA, // 0x036...
-    token1: USDT_BASE_SEPOLIA, // 0x718...
+    token0: USDT_BASE_SEPOLIA, // 0x2c0...
+    token1: USDC_BASE_SEPOLIA, // 0x3BF...
 };
 
 
