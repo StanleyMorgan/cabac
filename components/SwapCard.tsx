@@ -75,7 +75,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         },
     });
 
-    const { data: approveResult } = useSimulateContract<typeof ERC20_ABI, 'approve'>({
+    // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
+    const { data: approveResult } = useSimulateContract({
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
@@ -126,7 +127,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
 
-    const { data: swapResult } = useSimulateContract<typeof ROUTER_ABI, 'exactInputSingle'>({
+    // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
+    const { data: swapResult } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
