@@ -11,6 +11,7 @@ import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256 } from 'viem';
+import { baseSepolia } from 'viem/chains';
 
 interface SwapCardProps {
     isWalletConnected: boolean;
@@ -19,6 +20,9 @@ interface SwapCardProps {
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { address, chainId } = useAccount();
     const { openConnectModal } = useConnectModal();
+    
+    // Use a default chain for display purposes when not connected
+    const displayChainId = chainId || baseSepolia.id;
 
     const isSupportedChain = useMemo(() => {
         if (!chainId) return false;
@@ -30,9 +34,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
 
     const availableTokens = useMemo(() => {
-        if (!isSupportedChain || !chainId) return [];
-        return TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN] || [];
-    }, [chainId, isSupportedChain]);
+        return TOKENS_BY_CHAIN[displayChainId as keyof typeof TOKENS_BY_CHAIN] || [];
+    }, [displayChainId]);
 
     const [tokenIn, setTokenIn] = useState<Token | null>(null);
     const [tokenOut, setTokenOut] = useState<Token | null>(null);
@@ -169,16 +172,16 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, [amountInBigInt]);
     
     useEffect(() => {
-        if (availableTokens.length > 0) {
+        if (availableTokens.length > 0 && (!tokenIn || !tokenOut)) {
             setTokenIn(availableTokens[0]);
             setTokenOut(availableTokens.length > 1 ? availableTokens[1] : availableTokens[0]);
-        } else {
+        } else if (availableTokens.length === 0) {
             setTokenIn(null);
             setTokenOut(null);
         }
         setAmountIn('');
         setAmountOut('');
-    }, [availableTokens]);
+    }, [availableTokens, tokenIn, tokenOut]);
 
      useEffect(() => {
         if (isTxSuccess) {
@@ -234,19 +237,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter an amount';
         return 'Swap';
     };
-
-    if (!isWalletConnected) {
-        return (
-             <div className="w-full max-w-md bg-brand-surface rounded-2xl p-6 shadow-2xl border border-brand-secondary text-center">
-                <h2 className="text-xl font-bold mb-4">Swap</h2>
-                 <button onClick={openConnectModal} className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover transition-all mt-4">
-                    Connect Wallet
-                 </button>
-            </div>
-        )
-    }
-
-    if (!isSupportedChain || !tokenIn || !tokenOut) {
+    
+    if (isWalletConnected && (!isSupportedChain || !tokenIn || !tokenOut)) {
        return (
           <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
               <div className="flex justify-between items-center mb-4">
@@ -269,6 +261,15 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
       );
     }
     
+    if (!tokenIn || !tokenOut) {
+        // Initial loading state before default tokens are set
+        return (
+             <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
+                <div className="h-96 animate-pulse"></div>
+            </div>
+        )
+    }
+    
     return (
         <>
             <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
@@ -287,7 +288,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         onAmountChange={setAmountIn}
                         onTokenSelect={() => setIsSelectingFor('in')}
                         balance={balanceIn?.formatted}
-                        isBalanceLoading={!balanceIn}
+                        isBalanceLoading={isWalletConnected && !balanceIn}
                     />
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 my-[-12px] z-10">
                         <button onClick={handleSwapTokens} className="bg-brand-secondary hover:bg-brand-surface-2 rounded-full p-2 border-4 border-brand-surface transition-transform duration-300 ease-in-out hover:rotate-180">
@@ -301,7 +302,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         onAmountChange={() => {}}
                         onTokenSelect={() => setIsSelectingFor('out')}
                         balance={balanceOut?.formatted}
-                        isBalanceLoading={!balanceOut}
+                        isBalanceLoading={isWalletConnected && !balanceOut}
                         isOutput={true}
                     />
                 </div>
@@ -316,7 +317,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
                 <button
                     onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    disabled={!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)}
+                    disabled={(isWalletConnected && !isSupportedChain) || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
                     {getButtonText()}
