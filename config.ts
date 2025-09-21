@@ -8,9 +8,7 @@ export const ERC20_ABI = [
       { "name": "_spender", "type": "address" }
     ],
     "name": "allowance",
-    "outputs": [{ "name": "remaining", "type": "uint256" }],
-    "payable": false,
-    "stateMutability": "view",
+    "outputs": [{ "name": "", "type": "uint256" }],
     "type": "function"
   },
   {
@@ -20,37 +18,36 @@ export const ERC20_ABI = [
       { "name": "_value", "type": "uint256" }
     ],
     "name": "approve",
-    "outputs": [{ "name": "success", "type": "bool" }],
-    "payable": false,
-    "stateMutability": "nonpayable",
+    "outputs": [{ "name": "", "type": "bool" }],
     "type": "function"
-  }
+  },
 ] as const;
 
 export const ROUTER_ABI = [
-  {
-    "inputs": [
-      {
-        "components": [
-          { "internalType": "address", "name": "tokenIn", "type": "address" },
-          { "internalType": "address", "name": "tokenOut", "type": "address" },
-          { "internalType": "uint24", "name": "fee", "type": "uint24" },
-          { "internalType": "address", "name": "recipient", "type": "address" },
-          { "internalType": "uint256", "name": "deadline", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountIn", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountOutMinimum", "type": "uint256" },
-          { "internalType": "uint160", "name": "sqrtPriceLimitX96", "type": "uint160" }
+    {
+        "inputs": [
+            {
+                "components": [
+                    { "type": "address", "name": "tokenIn" },
+                    { "type": "address", "name": "tokenOut" },
+                    { "type": "uint24", "name": "fee" },
+                    { "type": "address", "name": "recipient" },
+                    { "type": "uint256", "name": "deadline" },
+                    { "type": "uint256", "name": "amountIn" },
+                    { "type": "uint256", "name": "amountOutMinimum" },
+                    { "type": "uint160", "name": "sqrtPriceLimitX96" }
+                ],
+                "name": "params",
+                "type": "tuple"
+            }
         ],
-        "internalType": "struct ISwapRouter.ExactInputSingleParams",
-        "name": "params",
-        "type": "tuple"
-      }
-    ],
-    "name": "exactInputSingle",
-    "outputs": [{ "internalType": "uint256", "name": "amountOut", "type": "uint256" }],
-    "stateMutability": "payable",
-    "type": "function"
-  }
+        "name": "exactInputSingle",
+        "outputs": [
+            { "type": "uint256", "name": "amountOut" }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    }
 ] as const;
 
 export const POOL_ABI = [
@@ -81,60 +78,54 @@ export const POOL_ABI = [
 ] as const;
 
 export const POSITION_MANAGER_ABI = [
-  {
-    "inputs": [
-      {
-        "components": [
-          { "internalType": "address", "name": "token0", "type": "address" },
-          { "internalType": "address", "name": "token1", "type": "address" },
-          { "internalType": "uint24", "name": "fee", "type": "uint24" },
-          { "internalType": "int24", "name": "tickLower", "type": "int24" },
-          { "internalType": "int24", "name": "tickUpper", "type": "int24" },
-          { "internalType": "uint256", "name": "amount0Desired", "type": "uint256" },
-          { "internalType": "uint256", "name": "amount1Desired", "type": "uint256" },
-          { "internalType": "uint256", "name": "amount0Min", "type": "uint256" },
-          { "internalType": "uint256", "name": "amount1Min", "type": "uint256" },
-          { "internalType": "address", "name": "recipient", "type": "address" },
-          { "internalType": "uint256", "name": "deadline", "type": "uint256" }
+    {
+        "inputs": [
+            {
+                "components": [
+                    { "internalType": "address", "name": "token0", "type": "address" },
+                    { "internalType": "address", "name": "token1", "type": "address" },
+                    { "internalType": "uint24", "name": "fee", "type": "uint24" },
+                    { "internalType": "int24", "name": "tickLower", "type": "int24" },
+                    { "internalType": "int24", "name": "tickUpper", "type": "int24" },
+                    { "internalType": "uint256", "name": "amount0Desired", "type": "uint256" },
+                    { "internalType": "uint256", "name": "amount1Desired", "type": "uint256" },
+                    { "internalType": "uint256", "name": "amount0Min", "type": "uint256" },
+                    { "internalType": "uint256", "name": "amount1Min", "type": "uint256" },
+                    { "internalType": "address", "name": "recipient", "type": "address" },
+                    { "internalType": "uint256", "name": "deadline", "type": "uint256" }
+                ],
+                "internalType": "struct INonfungiblePositionManager.MintParams",
+                "name": "params",
+                "type": "tuple"
+            }
         ],
-        "internalType": "struct INonfungiblePositionManager.MintParams",
-        "name": "params",
-        "type": "tuple"
-      }
-    ],
-    "name": "mint",
-    "outputs": [
-      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
-      { "internalType": "uint128", "name": "liquidity", "type": "uint128" },
-      { "internalType": "uint256", "name": "amount0", "type": "uint256" },
-      { "internalType": "uint256", "name": "amount1", "type": "uint256" }
-    ],
-    "stateMutability": "payable",
-    "type": "function"
-  }
+        "name": "mint",
+        "outputs": [
+            { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
+            { "internalType": "uint128", "name": "liquidity", "type": "uint128" },
+            { "internalType": "uint256", "name": "amount0", "type": "uint256" },
+            { "internalType": "uint256", "name": "amount1", "type": "uint256" }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    }
 ] as const;
 
-// Uniswap V3 contract addresses on various networks
-const UNISWAP_V3_ROUTER_SEPOLIA = '0x3bFA4769FB09eefC5aB096D48E9C6aC962d62338';
-const UNISWAP_V3_POSITION_MANAGER_SEPOLIA = '0x1238536071E1c577A6022ACf2c08B58Ee7F2E898';
-
-const UNISWAP_V3_ROUTER_BASE_SEPOLIA = '0x03a48B41c244848806A338075304B359e19bC8E4';
-const UNISWAP_V3_POSITION_MANAGER_BASE_SEPOLIA = '0x3c79D4a4b5D55DE5525204454839845340E2515a';
-
-
-// WETH addresses
-const WETH_SEPOLIA = '0x7b79995e5f793A07Bc00c21412e50Eaae098E7f9';
-const WETH_BASE_SEPOLIA = '0x4200000000000000000000000000000000000006';
-
-export const CONTRACT_ADDRESSES: { [chainId: number]: { ROUTER: `0x${string}`, POSITION_MANAGER: `0x${string}`, WETH: `0x${string}` } } = {
+export const CONTRACT_ADDRESSES: {
+    [chainId: number]: {
+        ROUTER: `0x${string}`;
+        WETH: `0x${string}`;
+        POSITION_MANAGER: `0x${string}`;
+    };
+} = {
     [sepolia.id]: {
-        ROUTER: UNISWAP_V3_ROUTER_SEPOLIA,
-        POSITION_MANAGER: UNISWAP_V3_POSITION_MANAGER_SEPOLIA,
-        WETH: WETH_SEPOLIA,
+        ROUTER: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
+        WETH: '0x7b79995e5f793A07Bc00c21412e50Eaae098E7f9',
+        POSITION_MANAGER: '0x1238536071E1c577A6022ACf2A142739B9F0422f',
     },
     [baseSepolia.id]: {
-        ROUTER: UNISWAP_V3_ROUTER_BASE_SEPOLIA,
-        POSITION_MANAGER: UNISWAP_V3_POSITION_MANAGER_BASE_SEPOLIA,
-        WETH: WETH_BASE_SEPOLIA,
+        ROUTER: '0x940908f2216524D414d231221c33dE4417d4D362',
+        WETH: '0x4200000000000000000000000000000000000006',
+        POSITION_MANAGER: '0x323A5734289389531818a335E30064C42125191C',
     }
 };

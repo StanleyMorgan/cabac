@@ -68,7 +68,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     });
 
     const { data: slot0, isLoading: isSlot0Loading } = useReadContract({
-        address: pool.address,
+        address: pool.address as `0x${string}`,
         abi: POOL_ABI,
         functionName: 'slot0',
         chainId,
@@ -76,7 +76,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     });
     
     const { data: tickSpacing } = useReadContract({
-        address: pool.address,
+        address: pool.address as `0x${string}`,
         abi: POOL_ABI,
         functionName: 'tickSpacing',
         chainId,
@@ -121,12 +121,15 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         return [Math.max(lower, MIN_TICK), Math.min(upper, MAX_TICK)];
     }, [minPrice, maxPrice, tickSpacing, token0.decimals, token1.decimals]);
 
-    const isApproval0Needed = useMemo(() => allowance0 !== undefined && amount0BigInt > 0n && allowance0 < amount0BigInt, [allowance0, amount0BigInt]);
-    const isApproval1Needed = useMemo(() => allowance1 !== undefined && amount1BigInt > 0n && allowance1 < amount1BigInt, [allowance1, amount1BigInt]);
+    // FIX: Used `typeof allowance0 === 'bigint'` to correctly narrow the type for comparison.
+    const isApproval0Needed = useMemo(() => typeof allowance0 === 'bigint' && amount0BigInt > 0n && allowance0 < amount0BigInt, [allowance0, amount0BigInt]);
+    // FIX: Used `typeof allowance1 === 'bigint'` to correctly narrow the type for comparison.
+    const isApproval1Needed = useMemo(() => typeof allowance1 === 'bigint' && amount1BigInt > 0n && allowance1 < amount1BigInt, [allowance1, amount1BigInt]);
 
     // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
     const { data: approve0Result } = useSimulateContract({
-        address: token0.address,
+        // FIX: Cast token address to `0x${string}` to match wagmi's expected type.
+        address: token0.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] : undefined,
@@ -135,7 +138,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
 
     // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
     const { data: approve1Result } = useSimulateContract({
-        address: token1.address,
+        // FIX: Cast token address to `0x${string}` to match wagmi's expected type.
+        address: token1.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] : undefined,

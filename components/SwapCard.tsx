@@ -150,7 +150,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, [amountIn, amountOut]);
 
     useEffect(() => {
-        if (tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && allowance !== undefined && amountInBigInt > 0) {
+        // FIX: Used `typeof allowance === 'bigint'` to correctly narrow the type for comparison.
+        if (tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && typeof allowance === 'bigint' && amountInBigInt > 0) {
             setIsApprovalNeeded(allowance < amountInBigInt);
         } else {
             setIsApprovalNeeded(false);
