@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
@@ -64,10 +62,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
         functionName: 'allowance',
-        args: [address!, contracts?.ROUTER!],
+        args: [address, contracts?.ROUTER],
         chainId: chainId,
         query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts,
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
         },
     });
 
@@ -79,57 +77,70 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [allowance, amountInBigInt, tokenIn]);
 
-    // FIX: Simulate approve transaction
+    // Simulate approve transaction
     const { data: approveResult } = useSimulateContract({
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [contracts?.ROUTER!, maxUint256],
+        args: [contracts?.ROUTER, maxUint256],
         query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts && isApprovalNeeded,
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
         },
     });
 
-    // FIX: Simulate swap transaction to get quote and prepare the transaction
-    const { data: quoteResult } = useSimulateContract({
+    // Prepare swap arguments safely
+    const swapArgs = useMemo(() => {
+        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH) return undefined;
+        
+        return {
+            tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
+            tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
+            fee: 3000,
+            recipient: address,
+            deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+            amountIn: amountInBigInt,
+            amountOutMinimum: amountOutMinimum,
+            sqrtPriceLimitX96: 0n,
+        };
+    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
+
+    // Simulate swap transaction to get quote and prepare the transaction
+    const { data: quoteResult, refetch: refetchQuote } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
-        args: [
-            {
-                tokenIn: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH! : tokenIn?.address as `0x${string}`,
-                tokenOut: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH! : tokenOut?.address as `0x${string}`,
-                fee: 3000, // Common 0.3% fee tier
-                recipient: address!,
-                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
-                amountIn: amountInBigInt,
-                amountOutMinimum: amountOutMinimum,
-                sqrtPriceLimitX96: 0n,
-            },
-        ],
+        args: swapArgs ? [swapArgs] : undefined,
+        // FIX: Include value in simulation for native token swaps to ensure correct request preparation.
+        value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
         query: {
-            enabled: amountInBigInt > 0 && !!tokenIn && !!tokenOut && !!address && !!contracts && !isApprovalNeeded,
+            enabled: amountInBigInt > 0 && !!swapArgs && !isApprovalNeeded,
         },
     });
-
+    
     useEffect(() => {
         if (amountInBigInt > 0 && tokenIn && tokenOut) {
             if (quoteResult?.result) {
-                setIsQuoteLoading(true);
                 const quoteAmount = quoteResult.result as bigint;
                 const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
                 setAmountOut(formattedAmount);
+                // Calculate minimum amount out based on slippage
                 const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
                 if(newAmountOutMinimum !== amountOutMinimum) {
                     setAmountOutMinimum(newAmountOutMinimum);
                 }
-                setIsQuoteLoading(false);
             }
         } else {
             setAmountOut('');
             setAmountOutMinimum(0n);
         }
     }, [quoteResult?.result, amountInBigInt, tokenIn, tokenOut, slippage, amountOutMinimum]);
+    
+    // This effect ensures we get a new quote if slippage changes
+    useEffect(() => {
+        if(amountInBigInt > 0 && swapArgs) {
+            refetchQuote();
+        }
+    }, [amountOutMinimum, refetchQuote, amountInBigInt, swapArgs]);
 
 
     useEffect(() => {
@@ -169,29 +180,23 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountOut(amountIn);
     }, [tokenIn, tokenOut, amountIn, amountOut]);
     
-    // FIX: Use prepared request from useSimulateContract for approve
     const handleApprove = async () => {
         if (!approveResult?.request) return;
         try {
             await writeContractAsync(approveResult.request);
         } catch (error) {
             console.error("Approval failed:", error);
-            // Add user feedback here
         }
     };
     
-    // FIX: Use prepared request from useSimulateContract for swap
     const handleSwap = async () => {
         if (!quoteResult?.request) return;
         try {
-            const isNativeIn = tokenIn?.address === NATIVE_TOKEN_ADDRESS;
-            await writeContractAsync({
-                ...quoteResult.request,
-                value: isNativeIn ? amountInBigInt : 0n,
-            });
+            // FIX: Pass the prepared request from useSimulateContract directly.
+            // The `value` is now correctly included in the request.
+            await writeContractAsync(quoteResult.request);
         } catch (error) {
             console.error("Swap failed:", error);
-            // Add user feedback here
         }
     }
 
