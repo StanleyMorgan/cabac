@@ -69,9 +69,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'allowance',
         args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] : undefined,
         chainId: chainId,
-        query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
-        },
+        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
+        enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
     });
 
     const { data: approveResult } = useSimulateContract({
@@ -79,9 +78,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
-        query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
-        },
+        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
+        enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
     });
 
     const quoteArgs = useMemo(() => {
@@ -104,9 +102,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'exactInputSingle',
         args: quoteArgs ? [quoteArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        query: {
-            enabled: !!quoteArgs && !isApprovalNeeded,
-        },
+        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
+        enabled: !!quoteArgs && !isApprovalNeeded,
     });
     
     const swapArgs = useMemo(() => {
@@ -129,9 +126,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'exactInputSingle',
         args: swapArgs ? [swapArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        query: {
-            enabled: !!swapArgs && !isApprovalNeeded,
-        },
+        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
+        enabled: !!swapArgs && !isApprovalNeeded,
     });
 
     const exchangeRate = useMemo(() => {

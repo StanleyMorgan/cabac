@@ -1,6 +1,8 @@
 import '@rainbow-me/rainbowkit/styles.css';
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+// FIX: Import QueryClient from @tanstack/query-core to resolve export issue.
+import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/query-core';
 import React from 'react';
 import { WagmiProvider } from 'wagmi';
 import { sepolia, baseSepolia, celoSepolia as viemCeloSepolia } from 'viem/chains';

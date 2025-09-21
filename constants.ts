@@ -1,4 +1,4 @@
-import type { Token } from './types';
+import type { Token, Pool } from './types';
 import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 
 // Using a conventional address for native tokens
@@ -74,4 +74,19 @@ export const TOKENS_BY_CHAIN: Record<number, Token[]> = {
       decimals: 18,
     },
   ],
+};
+
+
+const baseSepoliaTokens = TOKENS_BY_CHAIN[baseSepolia.id];
+const baseSepoliaUsdc = baseSepoliaTokens.find(t => t.symbol === 'USDC');
+const baseSepoliaUsdt = baseSepoliaTokens.find(t => t.symbol === 'USDT');
+
+export const POOLS_BY_CHAIN: Record<number, Pool[]> = {
+  [baseSepolia.id]: (baseSepoliaUsdc && baseSepoliaUsdt) ? [
+    {
+      address: '0xDA84d2f810f682fb392CA1126CAe7462542B0903',
+      token0: baseSepoliaUsdc,
+      token1: baseSepoliaUsdt,
+    },
+  ] : [],
 };
