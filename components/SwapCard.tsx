@@ -115,17 +115,22 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     });
 
     useEffect(() => {
-        if (quoteResult?.result && tokenOut) {
-            const quoteAmount = quoteResult.result as bigint;
+        if (!quoteResult || !tokenOut) {
+            return;
+        }
+        
+        const quoteAmount = quoteResult.result;
+
+        if (typeof quoteAmount === 'bigint' && quoteAmount > 0n) {
             const formattedAmount = formatUnits(quoteAmount, tokenOut.decimals);
             setAmountOut(formattedAmount);
             const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
             setAmountOutMinimum(newAmountOutMinimum);
         }
-    }, [quoteResult?.result, tokenOut, slippage]);
+    }, [quoteResult, tokenOut, slippage]);
 
     useEffect(() => {
-        if (amountInBigInt <= 0) {
+        if (amountInBigInt <= 0n) {
             setAmountOut('');
             setAmountOutMinimum(0n);
         }
@@ -197,8 +202,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const handleApprove = async () => {
         // FIX: Changed guard clause to check for approveResult object existence first to help with type inference.
         if (!approveResult) return;
+        // FIX: Destructure request from approveResult to help with TypeScript type inference.
+        const { request } = approveResult;
         try {
-            await writeContractAsync(approveResult.request);
+            await writeContractAsync(request);
         } catch (error) {
             console.error("Approval failed:", error);
         }
@@ -207,8 +214,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const handleSwap = async () => {
         // FIX: Changed guard clause to check for swapResult object existence first to help with type inference.
         if (!swapResult) return;
+        // FIX: Destructure request from swapResult to help with TypeScript type inference.
+        const { request } = swapResult;
         try {
-            await writeContractAsync(swapResult.request);
+            await writeContractAsync(request);
         } catch (error) {
             console.error("Swap failed:", error);
         }
