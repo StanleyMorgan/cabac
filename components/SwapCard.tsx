@@ -23,15 +23,17 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const isSupportedChain = useMemo(() => {
         if (!chainId) return false;
-        return !!TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN];
+        const hasTokens = !!TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN];
+        const hasContracts = !!CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES];
+        return hasTokens && hasContracts;
     }, [chainId]);
 
     const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
 
     const availableTokens = useMemo(() => {
-        if (!chainId) return []; // Don't assume a chain, wait for wagmi to provide it.
+        if (!isSupportedChain || !chainId) return []; // Only return tokens for fully supported chains
         return TOKENS_BY_CHAIN[chainId as keyof typeof TOKENS_BY_CHAIN] || [];
-    }, [chainId]);
+    }, [chainId, isSupportedChain]);
 
     const [tokenIn, setTokenIn] = useState<Token | null>(null);
     const [tokenOut, setTokenOut] = useState<Token | null>(null);
@@ -62,7 +64,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
         functionName: 'allowance',
-        args: [address, contracts?.ROUTER],
+        args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] : undefined,
         chainId: chainId,
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
@@ -81,7 +83,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        // FIX: Ensure args are not undefined when the hook is type-checked, even if disabled.
         args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
@@ -144,7 +145,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
      useEffect(() => {
         if (isTxSuccess) {
-            refetchAllowance();
+            // FIX: Prefix with 'void' to explicitly ignore the returned promise.
+            void refetchAllowance();
             reset();
         }
     }, [isTxSuccess, reset, refetchAllowance]);
@@ -193,7 +195,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, [tokenIn, tokenOut, amountIn, amountOut]);
     
     const handleApprove = async () => {
-        if (!approveResult?.request) return;
+        // FIX: Changed guard clause to check for approveResult object existence first to help with type inference.
+        if (!approveResult) return;
         try {
             await writeContractAsync(approveResult.request);
         } catch (error) {
@@ -202,7 +205,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     };
     
     const handleSwap = async () => {
-        if (!swapResult?.request) return;
+        // FIX: Changed guard clause to check for swapResult object existence first to help with type inference.
+        if (!swapResult) return;
         try {
             await writeContractAsync(swapResult.request);
         } catch (error) {
@@ -231,16 +235,25 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         )
     }
 
-    if (!tokenIn || !tokenOut) {
+    if (!isSupportedChain || !tokenIn || !tokenOut) {
        return (
-          <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary animate-pulse">
+          <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
               <div className="flex justify-between items-center mb-4">
-                  <div className="h-7 bg-brand-surface-2 rounded w-1/4"></div>
-                  <div className="h-7 w-7 bg-brand-surface-2 rounded-full"></div>
+                  <h2 className="text-xl font-bold">Swap</h2>
+                  <button disabled className="text-brand-text-secondary">
+                      <SettingsIcon className="w-6 h-6" />
+                  </button>
               </div>
-              <div className="h-28 bg-brand-surface-2 rounded-xl mb-1"></div>
+              <div className="h-28 bg-brand-surface-2 rounded-xl mb-1 flex items-center justify-center text-brand-text-secondary">
+                  {!isSupportedChain && chainId ? 'Network not supported' : 'Loading...'}
+              </div>
               <div className="h-28 bg-brand-surface-2 rounded-xl"></div>
-              <div className="h-12 bg-brand-surface-2 rounded-xl mt-4"></div>
+              <button
+                  disabled
+                  className="w-full bg-brand-secondary text-white text-lg font-bold py-3 rounded-xl disabled:cursor-not-allowed transition-all mt-4"
+                >
+                    {isSupportedChain ? 'Loading...' : 'Unsupported Network'}
+                </button>
           </div>
       );
     }
