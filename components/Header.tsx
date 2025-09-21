@@ -11,7 +11,7 @@ const Header: React.FC = () => {
             <BeerMugIcon className="h-8 w-8 text-brand-primary" />
             <span className="text-xl font-bold text-brand-text-primary">Cabac</span>
           </div>
-          <ConnectButton />
+          <ConnectButton showBalance={false} />
         </div>
       </div>
     </header>
