@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Pool } from '../types';
 import { ExternalLinkIcon } from './icons/ExternalLinkIcon';
-import { useNetwork } from 'wagmi';
+import { useAccount } from 'wagmi';
 
 interface PoolListItemProps {
   pool: Pool;
@@ -9,7 +9,7 @@ interface PoolListItemProps {
 }
 
 const PoolListItem: React.FC<PoolListItemProps> = ({ pool, onSelect }) => {
-  const { chain } = useNetwork();
+  const { chain } = useAccount();
   const explorerUrl = chain?.blockExplorers?.default.url;
 
   return (
