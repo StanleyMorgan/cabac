@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { POOLS_BY_CHAIN } from '../constants';
 import { baseSepolia, sepolia, celoSepolia } from 'viem/chains';
 import { ExternalLinkIcon } from './icons/ExternalLinkIcon';
+import AddLiquidityCard from './AddLiquidityCard';
+import type { Pool } from '../types';
 
 const Pools: React.FC = () => {
     const { chain } = useAccount();
     const displayChainId = chain?.id || baseSepolia.id;
+    const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
 
     const pools = POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
 
@@ -18,6 +21,10 @@ const Pools: React.FC = () => {
         };
         return explorers[displayChainId] || '#';
     }
+    
+    if (selectedPool) {
+        return <AddLiquidityCard pool={selectedPool} onBack={() => setSelectedPool(null)} />
+    }
 
     return (
         <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
@@ -27,7 +34,7 @@ const Pools: React.FC = () => {
             <div className="space-y-3">
                 {pools.length > 0 ? (
                     pools.map((pool) => (
-                        <div key={pool.address} className="bg-brand-surface-2 p-4 rounded-xl">
+                        <div key={pool.address} className="bg-brand-surface-2 p-4 rounded-xl space-y-4">
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center space-x-3">
                                     <div className="flex -space-x-3">
@@ -46,6 +53,12 @@ const Pools: React.FC = () => {
                                     <ExternalLinkIcon className="w-5 h-5" />
                                 </a>
                             </div>
+                             <button 
+                                onClick={() => setSelectedPool(pool)}
+                                className="w-full bg-brand-primary text-white font-bold py-2 rounded-lg hover:bg-brand-primary-hover transition-colors"
+                             >
+                                Add Liquidity
+                             </button>
                         </div>
                     ))
                 ) : (

@@ -47,7 +47,7 @@ export const TOKENS_BY_CHAIN: Record<number, Token[]> = {
       symbol: 'USDT',
       name: 'Tether USD',
       logoURI: 'https://assets.coingecko.com/coins/images/325/large/Tether.png',
-      address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9', // Placeholder: Base Mainnet USDC address
+      address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9',
       decimals: 18,
     },
   ],
@@ -81,12 +81,24 @@ const baseSepoliaTokens = TOKENS_BY_CHAIN[baseSepolia.id];
 const baseSepoliaUsdc = baseSepoliaTokens.find(t => t.symbol === 'USDC');
 const baseSepoliaUsdt = baseSepoliaTokens.find(t => t.symbol === 'USDT');
 
+// Uniswap V3 requires token0 to be the token with the lower address
+let token0: Token | undefined, token1: Token | undefined;
+if (baseSepoliaUsdc && baseSepoliaUsdt) {
+    if (baseSepoliaUsdc.address.toLowerCase() < baseSepoliaUsdt.address.toLowerCase()) {
+        token0 = baseSepoliaUsdc;
+        token1 = baseSepoliaUsdt;
+    } else {
+        token0 = baseSepoliaUsdt;
+        token1 = baseSepoliaUsdc;
+    }
+}
+
 export const POOLS_BY_CHAIN: Record<number, Pool[]> = {
-  [baseSepolia.id]: (baseSepoliaUsdc && baseSepoliaUsdt) ? [
+  [baseSepolia.id]: (token0 && token1) ? [
     {
       address: '0xDA84d2f810f682fb392CA1126CAe7462542B0903',
-      token0: baseSepoliaUsdc,
-      token1: baseSepoliaUsdt,
+      token0: token0,
+      token1: token1,
     },
   ] : [],
 };

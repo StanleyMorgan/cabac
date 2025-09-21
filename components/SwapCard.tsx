@@ -69,17 +69,21 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'allowance',
         args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] : undefined,
         chainId: chainId,
-        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
-        enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
+        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
+        query: {
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
+        },
     });
 
-    const { data: approveResult } = useSimulateContract({
+    const { data: approveResult } = useSimulateContract<typeof ERC20_ABI, 'approve'>({
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
-        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
-        enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
+        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
+        query: {
+            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
+        },
     });
 
     const quoteArgs = useMemo(() => {
@@ -102,8 +106,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'exactInputSingle',
         args: quoteArgs ? [quoteArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
-        enabled: !!quoteArgs && !isApprovalNeeded,
+        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
+        query: {
+            enabled: !!quoteArgs && !isApprovalNeeded,
+        },
     });
     
     const swapArgs = useMemo(() => {
@@ -120,14 +126,16 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
 
-    const { data: swapResult } = useSimulateContract({
+    const { data: swapResult } = useSimulateContract<typeof ROUTER_ABI, 'exactInputSingle'>({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
         args: swapArgs ? [swapArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        // FIX: Moved 'enabled' to be a top-level property instead of inside 'query'
-        enabled: !!swapArgs && !isApprovalNeeded,
+        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
+        query: {
+            enabled: !!swapArgs && !isApprovalNeeded,
+        },
     });
 
     const exchangeRate = useMemo(() => {
