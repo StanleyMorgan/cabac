@@ -93,6 +93,8 @@ const POOL_WETH_USDC_SEPOLIA: Pool = {
     address: '0x7a43793A32aF1550a43054135285786b4374352a', // Placeholder
     token0: WETH_SEPOLIA,
     token1: USDC_SEPOLIA,
+    tvl: 1250000.50,
+    myLiquidity: 0,
 };
 
 const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
@@ -100,6 +102,8 @@ const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     // token0 must be the token with the smaller address
     token0: USDT_BASE_SEPOLIA, // 0x2c0...
     token1: USDC_BASE_SEPOLIA, // 0x3BF...
+    tvl: 5430123.88,
+    myLiquidity: 12345.67,
 };
 
 const POOL_USDC_USDE_BASE_SEPOLIA: Pool = {
@@ -107,6 +111,8 @@ const POOL_USDC_USDE_BASE_SEPOLIA: Pool = {
     // token0 must be the token with the smaller address
     token0: USDC_BASE_SEPOLIA, // 0x3BF...
     token1: USDE_BASE_SEPOLIA, // 0x696...
+    tvl: 890456.12,
+    myLiquidity: 0,
 };
 
 
