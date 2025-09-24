@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useAccount, useReadContracts } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
-// FIX: Imported `Abi` type to simplify contract call types and prevent TS errors.
-import { formatUnits, type Abi } from 'viem';
+// FIX: Removed unused `Abi` import after refactoring to let TypeScript infer contract types.
+import { formatUnits } from 'viem';
 import { POOLS_BY_CHAIN } from '../constants';
 import { Pool } from '../types';
 import { PoolTableRow } from './PoolTableRow';
 import AddLiquidityCard from './AddLiquidityCard';
 import RemoveLiquidityCard from './RemoveLiquidityCard';
+import { RefreshIcon } from './icons/RefreshIcon';
 
 // FIX: Define a simpler ABI containing only the 'balanceOf' function to reduce
 // type complexity for the TypeScript compiler, which can help prevent the
@@ -22,22 +23,9 @@ const BALANCE_OF_ABI = [
     }
 ] as const;
 
-// Define a specific type for the contract call to prevent a "Type instantiation is excessively deep"
-// error when using `useReadContracts` with a dynamically generated array.
-// This helps TypeScript without having to loosen the ABI's type.
-type Erc20BalanceOfCall = {
-    address: `0x${string}`;
-    // FIX: Using the generic `Abi` type widens the type of the ABI, reducing complexity for
-    // the TypeScript compiler and preventing "Type instantiation excessively deep" errors.
-    // The return type of `useReadContracts` will be less specific, but the existing
-    // code already casts the result, so this is safe.
-    abi: Abi;
-    functionName: 'balanceOf';
-    // FIX: Changed args to `readonly unknown[]` to reduce type complexity and prevent "Type instantiation is excessively deep" error.
-    args: readonly unknown[];
-    chainId: number;
-};
-
+// FIX: Removed the explicit `Erc20BalanceOfCall` type. Relying on TypeScript's inference
+// for the dynamically generated contract array is simpler and avoids the "excessively deep"
+// type error that occurred with explicit, complex types.
 const Pools: React.FC = () => {
     const { chainId, isConnected } = useAccount();
     const displayChainId = chainId || baseSepolia.id;
@@ -46,11 +34,12 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    const contractsToRead = useMemo((): readonly Erc20BalanceOfCall[] => {
+    const contractsToRead = useMemo(() => {
         // FIX: Replaced `.flatMap()` with a `for...of` loop. This imperative approach is often
         // easier for the TypeScript compiler to analyze and helps break the complex type
         // inference cycle that was causing the "excessively deep" error.
-        const calls: Erc20BalanceOfCall[] = [];
+        // By removing type annotations, we let TS infer the most accurate and simple type.
+        const calls = [];
         for (const pool of basePools) {
             calls.push({
                 address: pool.token0.address as `0x${string}`,
@@ -76,12 +65,16 @@ const Pools: React.FC = () => {
         return calls;
     }, [basePools, displayChainId]);
 
-    const { data: balanceResults, isLoading: areBalancesLoading } = useReadContracts({
-        // FIX: Removed `as any` cast. By simplifying the contract call types with `Abi`,
-        // TypeScript can correctly infer the types without running into complexity limits.
+    const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
+        // Letting TypeScript infer the `contractsToRead` type resolves the complexity error.
         contracts: contractsToRead,
         query: { enabled: isConnected && basePools.length > 0 }
     });
+    
+    const handleRefresh = useCallback(() => {
+        if (areBalancesFetching) return;
+        void refetchBalances();
+    }, [areBalancesFetching, refetchBalances]);
 
     const poolsWithTVL = useMemo(() => {
         if (!balanceResults || balanceResults.length === 0) {
@@ -134,7 +127,17 @@ const Pools: React.FC = () => {
 
     return (
         <div className="w-full max-w-2xl bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
-            <h2 className="text-xl font-bold mb-4">Pools</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Pools</h2>
+                 <button 
+                    onClick={handleRefresh} 
+                    disabled={areBalancesFetching} 
+                    className="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    aria-label="Refresh pool data"
+                >
+                    <RefreshIcon className={`w-5 h-5 ${areBalancesFetching ? 'animate-spin' : ''}`} />
+                </button>
+            </div>
             
             {basePools.length > 0 ? (
                 <div className="overflow-x-auto">

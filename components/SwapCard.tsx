@@ -8,6 +8,7 @@ import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
@@ -72,13 +73,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         );
     }, [tokenIn, tokenOut, allPoolsForChain, contracts]);
 
-    const { data: balanceIn } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
-    const { data: balanceOut } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
+    const { data: balanceIn, refetch: refetchBalanceIn, isFetching: isBalanceInFetching } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
+    const { data: balanceOut, refetch: refetchBalanceOut, isFetching: isBalanceOutFetching } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
 
     const { writeContract, data: txHash, isPending: isTxPending, reset } = useWriteContract();
     const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-    const { data: allowanceResult, refetch: refetchAllowance } = useReadContract({
+    const { data: allowanceResult, refetch: refetchAllowance, isFetching: isAllowanceFetching } = useReadContract({
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
         functionName: 'allowance',
@@ -114,7 +115,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt, selectedPool]);
 
-    const { data: quoteResult, isLoading: isQuoteLoading, error: quoteError } = useSimulateContract({
+    const { data: quoteResult, isLoading: isQuoteLoading, isFetching: isQuoteFetching, error: quoteError, refetch: refetchQuote } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
@@ -149,6 +150,17 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             enabled: !!swapArgs && !isApprovalNeeded,
         },
     });
+
+    const isRefreshing = isQuoteFetching || isBalanceInFetching || isBalanceOutFetching || isAllowanceFetching;
+
+    const handleRefresh = useCallback(() => {
+        if (isRefreshing) return;
+        void refetchQuote();
+        void refetchBalanceIn();
+        void refetchBalanceOut();
+        void refetchAllowance();
+    }, [isRefreshing, refetchQuote, refetchBalanceIn, refetchBalanceOut, refetchAllowance]);
+
 
     const exchangeRate = useMemo(() => {
         const numAmountIn = parseFloat(amountIn);
@@ -278,7 +290,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         console.log("Is Approval Needed:", isApprovalNeeded);
         console.log("--- Quote Simulation ---");
         console.log("Quote Args:", quoteArgs);
-        console.log("Is Quote Loading:", isQuoteLoading);
+        console.log("Is Quote Loading/Fetching:", isQuoteLoading, isQuoteFetching);
         const qError = (quoteError as BaseError)?.shortMessage || quoteError?.message;
         console.log("Quote Sim Result:", { result: quoteResult?.result, error: qError });
         console.log("--- Swap Simulation ---");
@@ -297,7 +309,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         console.groupEnd();
     }, [
         chainId, address, isSupportedChain, contracts, tokenIn, tokenOut, amountIn, amountInBigInt, amountOut,
-        selectedPool, allowance, isApprovalNeeded, quoteArgs, isQuoteLoading, quoteResult, quoteError, amountOutMinimum,
+        selectedPool, allowance, isApprovalNeeded, quoteArgs, isQuoteLoading, isQuoteFetching, quoteResult, quoteError, amountOutMinimum,
         swapArgs, swapResult, swapError, isTxPending, isTxConfirming, txHash, approveResult, isWalletConnected
     ]);
     
@@ -337,9 +349,23 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Swap</h2>
-                    <button onClick={() => setIsSettingsOpen(true)} className="text-brand-text-secondary hover:text-brand-text-primary transition-colors">
-                        <SettingsIcon className="w-6 h-6" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <button 
+                            onClick={handleRefresh} 
+                            disabled={isRefreshing} 
+                            className="text-brand-text-secondary hover:text-brand-text-primary transition-colors disabled:opacity-50 disabled:cursor-wait"
+                            aria-label="Refresh rates and balances"
+                        >
+                            <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button 
+                            onClick={() => setIsSettingsOpen(true)} 
+                            className="text-brand-text-secondary hover:text-brand-text-primary transition-colors"
+                             aria-label="Open settings"
+                        >
+                            <SettingsIcon className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="relative">
