@@ -56,20 +56,20 @@ const Pools: React.FC = () => {
                 address: pool.token0.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Added `as const` to the `args` array. This helps TypeScript infer the
-                // narrowest possible type for the tuple, which is crucial for `useReadContracts`
-                // to avoid deep type instantiation errors with dynamic contract arrays.
-                args: [pool.address as `0x${string}`] as const,
+                // FIX: Removed `as const` from the `args` array. While `as const` helps wagmi with
+                // type inference by creating a narrow tuple type, it was too complex for TypeScript
+                // to handle in this dynamically generated array, causing the "excessively deep" error.
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
             });
             calls.push({
                 address: pool.token1.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Added `as const` to the `args` array. This helps TypeScript infer the
-                // narrowest possible type for the tuple, which is crucial for `useReadContracts`
-                // to avoid deep type instantiation errors with dynamic contract arrays.
-                args: [pool.address as `0x${string}`] as const,
+                // FIX: Removed `as const` from the `args` array. While `as const` helps wagmi with
+                // type inference by creating a narrow tuple type, it was too complex for TypeScript
+                // to handle in this dynamically generated array, causing the "excessively deep" error.
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
             });
         }
