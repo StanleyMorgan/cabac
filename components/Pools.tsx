@@ -31,26 +31,26 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    // Replaced `reduce` with `flatMap` and added `as const` assertions.
-    // This helps TypeScript infer the narrowest possible types for the contract
-    // configuration objects, preventing the "Type instantiation is excessively deep" error
-    // in the `useReadContracts` hook by simplifying type resolution.
+    // FIX: Apply `as const` to each contract configuration object.
+    // This helps TypeScript infer the narrowest possible types, preventing the
+    // "Type instantiation is excessively deep" error in the `useReadContracts` hook
+    // by simplifying type resolution.
     const contractsToRead = useMemo(() => {
         return basePools.flatMap((pool) => [
             {
                 address: pool.token0.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf' as const,
-                args: [pool.address as `0x${string}`] as const,
+                functionName: 'balanceOf',
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
-            },
+            } as const,
             {
                 address: pool.token1.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf' as const,
-                args: [pool.address as `0x${string}`] as const,
+                functionName: 'balanceOf',
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
-            },
+            } as const,
         ]);
     }, [basePools, displayChainId]);
 

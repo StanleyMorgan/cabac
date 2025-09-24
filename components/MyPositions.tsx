@@ -15,6 +15,16 @@ type PositionData = {
     [key: string]: any;
 };
 
+// Helper to create a fallback token object for tokens not in our constants list
+const createFallbackToken = (address: string): Token => ({
+  address,
+  symbol: `${address.slice(0, 5)}...${address.slice(-4)}`,
+  name: 'Unknown Token',
+  // A self-contained SVG placeholder icon to avoid broken images
+  logoURI: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iIzRBNTU2OCIvPjx0ZXh0IHg9IjEyIiB5PSIxNyIgZm9udC1zaXplPSIxMiIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4/PC90ZXh0Pjwvc3ZnPg==',
+  decimals: 18, // Default to 18, which is common
+});
+
 
 // A component for a single position
 const PositionItem = ({ positionData }: { positionData: PositionData }) => {
@@ -22,14 +32,18 @@ const PositionItem = ({ positionData }: { positionData: PositionData }) => {
     const displayChainId = chainId || baseSepolia.id;
     const allTokens = useMemo(() => TOKENS_BY_CHAIN[displayChainId] || [], [displayChainId]);
 
-    const token0 = useMemo(() => allTokens.find(t => t.address.toLowerCase() === positionData.token0.toLowerCase()), [allTokens, positionData.token0]);
-    const token1 = useMemo(() => allTokens.find(t => t.address.toLowerCase() === positionData.token1.toLowerCase()), [allTokens, positionData.token1]);
+    // Find the token in our list, or create a fallback if it's not found.
+    // This ensures that the component always has token data to render.
+    const token0 = useMemo(() => {
+        const foundToken = allTokens.find(t => t.address.toLowerCase() === positionData.token0.toLowerCase());
+        return foundToken || createFallbackToken(positionData.token0);
+    }, [allTokens, positionData.token0]);
 
-    if (!token0 || !token1) {
-        return (
-            <div className="bg-brand-surface-2 p-3 rounded-lg animate-pulse h-16" />
-        );
-    }
+    const token1 = useMemo(() => {
+        const foundToken = allTokens.find(t => t.address.toLowerCase() === positionData.token1.toLowerCase());
+        return foundToken || createFallbackToken(positionData.token1);
+    }, [allTokens, positionData.token1]);
+
 
     // Uniswap V3's global min/max ticks for full range
     const isFullRange = positionData.tickLower === -887272 && positionData.tickUpper === 887272;
@@ -38,8 +52,8 @@ const PositionItem = ({ positionData }: { positionData: PositionData }) => {
         <div className="bg-brand-surface-2 p-3 rounded-lg flex justify-between items-center">
             <div className="flex items-center">
                 <div className="flex -space-x-2 mr-3">
-                    <img src={token0.logoURI} alt={token0.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface" />
-                    <img src={token1.logoURI} alt={token1.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface" />
+                    <img src={token0.logoURI} alt={token0.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface bg-gray-600" />
+                    <img src={token1.logoURI} alt={token1.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface bg-gray-600" />
                 </div>
                 <div>
                     <p className="font-bold text-base">{token0.symbol}/{token1.symbol}</p>
