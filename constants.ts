@@ -64,6 +64,14 @@ const USDT_BASE_SEPOLIA: Token = {
     decimals: 6,
 };
 
+const USDE_BASE_SEPOLIA: Token = {
+    address: '0x696c86d7dfb1Fea3fd3c900F480E536eD16E4780',
+    symbol: 'USDe',
+    name: 'Ethena USDe',
+    logoURI: 'https://assets.coingecko.com/coins/images/35346/small/USDe_logo_200x200.png',
+    decimals: 18,
+};
+
 
 export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
     [sepolia.id]: [
@@ -76,6 +84,7 @@ export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
         WETH_BASE_SEPOLIA,
         USDC_BASE_SEPOLIA,
         USDT_BASE_SEPOLIA,
+        USDE_BASE_SEPOLIA,
     ]
 };
 
@@ -93,12 +102,20 @@ const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     token1: USDC_BASE_SEPOLIA, // 0x3BF...
 };
 
+const POOL_USDC_USDE_BASE_SEPOLIA: Pool = {
+    address: '0xb823743A160a119597bf0Cf4De9778BBBFeefe26',
+    // token0 must be the token with the smaller address
+    token0: USDC_BASE_SEPOLIA, // 0x3BF...
+    token1: USDE_BASE_SEPOLIA, // 0x696...
+};
+
 
 export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
     [sepolia.id]: [
         POOL_WETH_USDC_SEPOLIA
     ],
     [baseSepolia.id]: [
-        POOL_USDC_USDT_BASE_SEPOLIA
+        POOL_USDC_USDT_BASE_SEPOLIA,
+        POOL_USDC_USDE_BASE_SEPOLIA,
     ]
 };
