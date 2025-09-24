@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
-import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
+import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
 import { ROUTER_ABI, ERC20_ABI, CONTRACT_ADDRESSES } from '../config';
 import { useDebounce } from '../hooks/useDebounce';
 import TokenInput from './TokenInput';
@@ -21,7 +21,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { address, chainId } = useAccount();
     const { openConnectModal } = useConnectModal();
     
-    // Use a default chain for display purposes when not connected
     const displayChainId = chainId || baseSepolia.id;
 
     const isSupportedChain = useMemo(() => {
@@ -35,6 +34,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const availableTokens = useMemo(() => {
         return TOKENS_BY_CHAIN[displayChainId as keyof typeof TOKENS_BY_CHAIN] || [];
+    }, [displayChainId]);
+    
+    const allPoolsForChain = useMemo(() => {
+        return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
     const [tokenIn, setTokenIn] = useState<Token | null>(null);
@@ -56,10 +59,22 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [debouncedAmountIn, tokenIn]);
 
+    const selectedPool = useMemo(() => {
+        if (!tokenIn || !tokenOut) return undefined;
+        // Natively handle ETH by comparing with WETH address in pools
+        const addressIn = tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH : tokenIn.address;
+        const addressOut = tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts?.WETH : tokenOut.address;
+        if (!addressIn || !addressOut) return undefined;
+
+        return allPoolsForChain.find(pool =>
+            (pool.token0.address.toLowerCase() === addressIn.toLowerCase() && pool.token1.address.toLowerCase() === addressOut.toLowerCase()) ||
+            (pool.token0.address.toLowerCase() === addressOut.toLowerCase() && pool.token1.address.toLowerCase() === addressIn.toLowerCase())
+        );
+    }, [tokenIn, tokenOut, allPoolsForChain, contracts]);
+
     const { data: balanceIn } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
     const { data: balanceOut } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
 
-    // FIX: Changed `writeContractAsync` to `writeContract` to fix TypeScript inference issue.
     const { writeContract, data: txHash, isPending: isTxPending, reset } = useWriteContract();
     const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -69,38 +84,35 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'allowance',
         args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] : undefined,
         chainId: chainId,
-        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
         },
     });
     const allowance = allowanceResult as bigint | undefined;
 
-    // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
     const { data: approveResult } = useSimulateContract({
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
-        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
         },
     });
 
     const quoteArgs = useMemo(() => {
-        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0) return undefined;
+        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || !selectedPool) return undefined;
         return {
             tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
             tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
-            fee: 3000,
+            fee: selectedPool.fee,
             recipient: address,
             deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             amountIn: amountInBigInt,
             amountOutMinimum: 0n,
             sqrtPriceLimitX96: 0n,
         };
-    }, [tokenIn, tokenOut, address, contracts, amountInBigInt]);
+    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, selectedPool]);
 
     const { data: quoteResult, isLoading: isQuoteLoading } = useSimulateContract({
         address: contracts?.ROUTER,
@@ -108,34 +120,31 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         functionName: 'exactInputSingle',
         args: quoteArgs ? [quoteArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
         query: {
             enabled: !!quoteArgs && !isApprovalNeeded,
         },
     });
     
     const swapArgs = useMemo(() => {
-        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n) return undefined;
+        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n || !selectedPool) return undefined;
         return {
             tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
             tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
-            fee: 3000,
+            fee: selectedPool.fee,
             recipient: address,
             deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             amountIn: amountInBigInt,
             amountOutMinimum: amountOutMinimum,
             sqrtPriceLimitX96: 0n,
         };
-    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum]);
+    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum, selectedPool]);
 
-    // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
     const { data: swapResult } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
         args: swapArgs ? [swapArgs] : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        // FIX: The 'enabled' option should be inside a 'query' object for wagmi v2 hooks.
         query: {
             enabled: !!swapArgs && !isApprovalNeeded,
         },
@@ -180,8 +189,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     
     useEffect(() => {
         if (availableTokens.length > 0 && (!tokenIn || !tokenOut)) {
-            setTokenIn(availableTokens[0]);
-            setTokenOut(availableTokens.length > 1 ? availableTokens[1] : availableTokens[0]);
+            setTokenIn(availableTokens.find(t => t.symbol === 'ETH') || availableTokens[0]);
+            setTokenOut(availableTokens.find(t => t.symbol === 'USDC') || (availableTokens.length > 1 ? availableTokens[1] : availableTokens[0]));
         } else if (availableTokens.length === 0) {
             setTokenIn(null);
             setTokenOut(null);
@@ -199,10 +208,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const handleTokenSelect = useCallback((token: Token) => {
         if (isSelectingFor === 'in') {
-            if (token.symbol === tokenOut?.symbol) setTokenOut(tokenIn);
+            if (token.address === tokenOut?.address) setTokenOut(tokenIn);
             setTokenIn(token);
         } else if (isSelectingFor === 'out') {
-             if (token.symbol === tokenIn?.symbol) setTokenIn(tokenOut);
+             if (token.address === tokenIn?.address) setTokenIn(tokenOut);
             setTokenOut(token);
         }
         setIsSelectingFor(null);
@@ -215,7 +224,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountOut(amountIn);
     }, [tokenIn, tokenOut, amountIn, amountOut]);
     
-    // FIX: Made function synchronous and use `writeContract`.
     const handleApprove = () => {
         if (!approveResult?.request) return;
         try {
@@ -225,7 +233,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     };
     
-    // FIX: Made function synchronous and use `writeContract`.
     const handleSwap = () => {
         if (!swapResult?.request) return;
         try {
@@ -241,6 +248,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (isTxPending) return 'Check Wallet...';
         if (isTxConfirming) return 'Transaction Confirming...';
         if (isApprovalNeeded) return `Approve ${tokenIn?.symbol}`;
+        if (amountIn && !selectedPool) return 'No pool available';
         if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter an amount';
         return 'Swap';
     };
@@ -269,7 +277,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }
     
     if (!tokenIn || !tokenOut) {
-        // Initial loading state before default tokens are set
         return (
              <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
                 <div className="h-96 animate-pulse"></div>
@@ -324,7 +331,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
                 <button
                     onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    disabled={(isWalletConnected && !isSupportedChain) || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)}
+                    disabled={(isWalletConnected && (!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request || !selectedPool)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)))}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
                     {getButtonText()}

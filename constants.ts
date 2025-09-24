@@ -1,4 +1,4 @@
-import { Token, Pool } from './types';
+import type { Token, Pool } from './types';
 import { sepolia, baseSepolia } from 'viem/chains';
 
 // A commonly used placeholder for native currency
@@ -93,6 +93,7 @@ const POOL_WETH_USDC_SEPOLIA: Pool = {
     address: '0x7a43793A32aF1550a43054135285786b4374352a', // Placeholder
     token0: WETH_SEPOLIA,
     token1: USDC_SEPOLIA,
+    fee: 3000,
     myLiquidity: 0,
 };
 
@@ -101,6 +102,7 @@ const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     // token0 must be the token with the smaller address
     token0: USDC_BASE_SEPOLIA, // 0x4b1...
     token1: USDT_BASE_SEPOLIA, // 0xAFf...
+    fee: 500, // 0.05% fee tier, common for stable pairs
     myLiquidity: 0,
 };
 
@@ -109,6 +111,7 @@ const POOL_USDE_USDT_BASE_SEPOLIA: Pool = {
     // token0 must be the token with the smaller address
     token0: USDE_BASE_SEPOLIA, // 0x7EC...
     token1: USDT_BASE_SEPOLIA, // 0xAFf...
+    fee: 500, // 0.05% fee tier, common for stable pairs
     myLiquidity: 0,
 };
 

@@ -178,7 +178,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         return {
             token0: token0.address as `0x${string}`,
             token1: token1.address as `0x${string}`,
-            fee: 3000,
+            // FIX: Use the pool's fee from props instead of a hardcoded value.
+            fee: pool.fee,
             tickLower: tickLower,
             tickUpper: tickUpper,
             amount0Desired: amount0BigInt,
@@ -188,7 +189,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
             recipient: address,
             deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
         };
-    }, [address, token0, token1, tickLower, tickUpper, amount0BigInt, amount1BigInt]);
+    }, [address, token0, token1, tickLower, tickUpper, amount0BigInt, amount1BigInt, pool]);
 
     const { data: mintResult, isError: isMintSimError, error: mintError } = useSimulateContract({
         address: contracts?.POSITION_MANAGER,
