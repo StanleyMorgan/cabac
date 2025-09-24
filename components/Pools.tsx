@@ -23,6 +23,19 @@ const BALANCE_OF_ABI = [
     }
 ] as const;
 
+// FIX: To prevent "Type instantiation is excessively deep" errors with `useReadContracts`,
+// we define a specific type for the contract call configuration and explicitly type the
+// dynamically generated array. This tells TypeScript to treat it as a simple array
+// rather than attempting to infer a complex and potentially infinitely deep tuple type.
+type BalanceOfContractConfig = {
+    address: `0x${string}`;
+    abi: typeof BALANCE_OF_ABI;
+    functionName: 'balanceOf';
+    args: readonly [`0x${string}`];
+    chainId: number;
+};
+
+
 // FIX: Removed the explicit `Erc20BalanceOfCall` type. Relying on TypeScript's inference
 // for the dynamically generated contract array is simpler and avoids the "excessively deep"
 // type error that occurred with explicit, complex types.
@@ -34,21 +47,13 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    const contractsToRead = useMemo(() => {
-        // FIX: Replaced `.flatMap()` with a `for...of` loop. This imperative approach is often
-        // easier for the TypeScript compiler to analyze and helps break the complex type
-        // inference cycle that was causing the "excessively deep" error.
-        // By removing type annotations, we let TS infer the most accurate and simple type.
-        const calls = [];
+    const contractsToRead = useMemo((): BalanceOfContractConfig[] => {
+        const calls: BalanceOfContractConfig[] = [];
         for (const pool of basePools) {
             calls.push({
                 address: pool.token0.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Re-added `as const` to the `args` array. This provides wagmi with a
-                // narrow tuple type, which is essential for correct type inference on the hook's
-                // return value. The "excessively deep" error is avoided by other changes,
-                // like using a simpler ABI and an imperative loop.
                 args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             });
@@ -56,10 +61,6 @@ const Pools: React.FC = () => {
                 address: pool.token1.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Re-added `as const` to the `args` array. This provides wagmi with a
-                // narrow tuple type, which is essential for correct type inference on the hook's
-                // return value. The "excessively deep" error is avoided by other changes,
-                // like using a simpler ABI and an imperative loop.
                 args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             });
@@ -68,7 +69,8 @@ const Pools: React.FC = () => {
     }, [basePools, displayChainId]);
 
     const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
-        // Letting TypeScript infer the `contractsToRead` type resolves the complexity error.
+        // By typing `contractsToRead` as an array, we prevent TypeScript from attempting
+        // deep tuple type inference, which was causing the error.
         contracts: contractsToRead,
         query: { enabled: isConnected && basePools.length > 0 }
     });

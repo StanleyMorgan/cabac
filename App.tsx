@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
@@ -6,14 +6,50 @@ import Pools from './components/Pools';
 
 const App: React.FC = () => {
   const { isConnected } = useAccount();
-  const [activeTab, setActiveTab] = useState<'swap' | 'pool'>('swap');
+  // State to track the current browser path
+  const [pathname, setPathname] = useState(window.location.pathname);
 
-  const getTabClass = (tabName: 'swap' | 'pool') => {
+  // Function to handle navigation without a full page reload
+  const navigate = useCallback((path: string) => {
+    window.history.pushState({}, '', path);
+    setPathname(path);
+  }, []);
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setPathname(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  const getTabClass = (path: '/swap' | '/pool') => {
+    // Treat the root path "/" as the "/swap" path for styling
+    const currentPath = pathname === '/' ? '/swap' : pathname;
+    const isActive = currentPath === path;
+    
     return `px-6 py-2 rounded-lg text-base font-semibold transition-colors ${
-      activeTab === tabName
+      isActive
         ? 'bg-brand-primary text-white'
         : 'text-brand-text-secondary hover:bg-brand-secondary'
     }`;
+  };
+
+  const renderContent = () => {
+    const currentPath = pathname === '/' ? '/swap' : pathname;
+
+    switch (currentPath) {
+      case '/swap':
+        return <SwapCard isWalletConnected={isConnected} />;
+      case '/pool':
+        return <Pools />;
+      default:
+        // Redirect to swap for any unknown paths
+        return <SwapCard isWalletConnected={isConnected} />;
+    }
   };
 
   return (
@@ -23,34 +59,25 @@ const App: React.FC = () => {
         <div className="flex justify-center mb-6">
           <div className="bg-brand-surface-2 p-1 rounded-xl flex space-x-1" role="tablist" aria-label="Swap or Pool">
             <button
-              onClick={() => setActiveTab('swap')}
-              className={getTabClass('swap')}
+              onClick={() => navigate('/swap')}
+              className={getTabClass('/swap')}
               role="tab"
-              aria-selected={activeTab === 'swap'}
-              aria-controls="swap-panel"
-              id="swap-tab"
+              aria-selected={pathname === '/swap' || pathname === '/'}
             >
               Swap
             </button>
             <button
-              onClick={() => setActiveTab('pool')}
-              className={getTabClass('pool')}
+              onClick={() => navigate('/pool')}
+              className={getTabClass('/pool')}
               role="tab"
-              aria-selected={activeTab === 'pool'}
-              aria-controls="pool-panel"
-              id="pool-tab"
+              aria-selected={pathname === '/pool'}
             >
               Pool
             </button>
           </div>
         </div>
         
-        <div id="swap-panel" role="tabpanel" aria-labelledby="swap-tab" hidden={activeTab !== 'swap'}>
-           {activeTab === 'swap' && <SwapCard isWalletConnected={isConnected} />}
-        </div>
-         <div id="pool-panel" role="tabpanel" aria-labelledby="pool-tab" hidden={activeTab !== 'pool'}>
-           {activeTab === 'pool' && <Pools />}
-        </div>
+        {renderContent()}
       </main>
     </div>
   );
