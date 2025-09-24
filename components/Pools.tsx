@@ -22,18 +22,6 @@ const minimalBalanceOfAbi = [
     }
 ] as const;
 
-// FIX: Define a specific type for the contract calls to prevent a TypeScript error
-// "Type instantiation is excessively deep and possibly infinite" when using useReadContracts
-// with a dynamically generated array of contracts. Using a minimal ABI type here is key.
-type BalanceOfContractCall = {
-    address: `0x${string}`;
-    abi: typeof minimalBalanceOfAbi;
-    functionName: 'balanceOf';
-    args: readonly [`0x${string}`];
-    chainId: number;
-};
-
-
 const Pools: React.FC = () => {
     const { chainId, isConnected } = useAccount();
     const displayChainId = chainId || baseSepolia.id;
@@ -42,27 +30,27 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    // FIX: Switched from `flatMap` to `reduce` with an explicitly typed accumulator.
-    // This helps TypeScript infer the type of the `contracts` array correctly for `useReadContracts`
-    // without getting into a deep recursion, thus resolving the type error and allowing removal of `as any`.
+    // FIX: Replaced `reduce` with `flatMap` and added `as const` assertions.
+    // This helps TypeScript infer the narrowest possible types for the contract
+    // configuration objects, preventing the "Type instantiation is excessively deep" error
+    // in the `useReadContracts` hook by simplifying type resolution.
     const contractsToRead = useMemo(() => {
-        return basePools.reduce<BalanceOfContractCall[]>((acc, pool) => {
-            acc.push({
+        return basePools.flatMap((pool) => [
+            {
                 address: pool.token0.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`],
+                functionName: 'balanceOf' as const,
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
-            });
-            acc.push({
+            },
+            {
                 address: pool.token1.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`],
+                functionName: 'balanceOf' as const,
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
-            });
-            return acc;
-        }, []);
+            },
+        ]);
     }, [basePools, displayChainId]);
 
     const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
