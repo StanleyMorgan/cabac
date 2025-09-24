@@ -150,6 +150,43 @@ export const POSITION_MANAGER_ABI = [
         ],
         "stateMutability": "payable",
         "type": "function"
+    },
+    {
+        "inputs": [{ "type": "address", "name": "owner" }],
+        "name": "balanceOf",
+        "outputs": [{ "type": "uint256", "name": "" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            { "type": "address", "name": "owner" },
+            { "type": "uint256", "name": "index" }
+        ],
+        "name": "tokenOfOwnerByIndex",
+        "outputs": [{ "type": "uint256", "name": "" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "type": "uint256", "name": "tokenId" }],
+        "name": "positions",
+        "outputs": [
+            { "type": "uint96", "name": "nonce" },
+            { "type": "address", "name": "operator" },
+            { "type": "address", "name": "token0" },
+            { "type": "address", "name": "token1" },
+            { "type": "uint24", "name": "fee" },
+            { "type": "int24", "name": "tickLower" },
+            { "type": "int24", "name": "tickUpper" },
+            { "type": "uint128", "name": "liquidity" },
+            { "type": "uint256", "name": "feeGrowthInside0LastX128" },
+            { "type": "uint256", "name": "feeGrowthInside1LastX128" },
+            { "type": "uint128", "name": "tokensOwed0" },
+            { "type": "uint128", "name": "tokensOwed1" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
     }
 ] as const;
 
