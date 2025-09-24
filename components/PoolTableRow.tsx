@@ -2,14 +2,13 @@ import React from 'react';
 import { Pool } from '../types';
 
 interface PoolTableRowProps {
-    pool?: Pool;
-    onAdd?: () => void;
-    onRemove?: () => void;
-    isLoading?: boolean;
+    pool: Pool;
+    onAdd: () => void;
+    onRemove: () => void;
 }
 
 const formatCurrency = (value: number | undefined) => {
-    if (value === undefined) return '$...';
+    if (value === undefined) return '...';
     if (value === 0) return '$0.00';
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -20,38 +19,7 @@ const formatCurrency = (value: number | undefined) => {
     }).format(value);
 };
 
-const SkeletonCell: React.FC = () => (
-    <td className="p-4 text-right">
-        <div className="h-5 w-24 bg-brand-surface-2 rounded-md animate-pulse ml-auto" />
-    </td>
-);
-
-
-const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove, isLoading = false }) => {
-    if (isLoading || !pool) {
-        return (
-            <tr className="border-b border-brand-secondary last:border-b-0">
-                <td className="p-4">
-                    <div className="flex items-center">
-                        <div className="flex -space-x-2 mr-3">
-                            <div className="w-7 h-7 rounded-full bg-brand-surface-2 animate-pulse border-2 border-brand-surface"></div>
-                            <div className="w-7 h-7 rounded-full bg-brand-surface-2 animate-pulse border-2 border-brand-surface"></div>
-                        </div>
-                        <div className="h-5 w-28 bg-brand-surface-2 rounded-md animate-pulse" />
-                    </div>
-                </td>
-                <SkeletonCell />
-                <SkeletonCell />
-                 <td className="p-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                        <div className="h-7 w-20 bg-brand-surface-2 rounded-lg animate-pulse" />
-                        <div className="h-7 w-14 bg-brand-surface-2 rounded-lg animate-pulse" />
-                    </div>
-                </td>
-            </tr>
-        );
-    }
-    
+const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove }) => {
     const { token0, token1, tvl, myLiquidity } = pool;
 
     return (

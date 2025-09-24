@@ -2,33 +2,16 @@ import { sepolia, baseSepolia } from 'viem/chains';
 
 // --- ABIs ---
 
-// FIX: Updated the ABI to a modern format to fix a type inference issue with wagmi's useReadContracts hook.
 export const ERC20_ABI = [
   {
+    "constant": true,
     "inputs": [
       {
-        "name": "owner",
-        "type": "address"
-      }
-    ],
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "name": "owner",
+        "name": "_owner",
         "type": "address"
       },
       {
-        "name": "spender",
+        "name": "_spender",
         "type": "address"
       }
     ],
@@ -39,17 +22,19 @@ export const ERC20_ABI = [
         "type": "uint256"
       }
     ],
+    "payable": false,
     "stateMutability": "view",
     "type": "function"
   },
   {
+    "constant": false,
     "inputs": [
       {
-        "name": "spender",
+        "name": "_spender",
         "type": "address"
       },
       {
-        "name": "value",
+        "name": "_value",
         "type": "uint256"
       }
     ],
@@ -60,6 +45,7 @@ export const ERC20_ABI = [
         "type": "bool"
       }
     ],
+    "payable": false,
     "stateMutability": "nonpayable",
     "type": "function"
   }

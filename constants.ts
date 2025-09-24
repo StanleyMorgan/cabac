@@ -53,7 +53,7 @@ const USDC_BASE_SEPOLIA: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-    decimals: 6,
+    decimals: 18,
 };
 
 const USDT_BASE_SEPOLIA: Token = {
@@ -61,7 +61,7 @@ const USDT_BASE_SEPOLIA: Token = {
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-    decimals: 6,
+    decimals: 18,
 };
 
 const USDE_BASE_SEPOLIA: Token = {
@@ -106,7 +106,7 @@ const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     myLiquidity: 12345.67,
 };
 
-const POOL_USDT_USDE_BASE_SEPOLIA: Pool = {
+const POOL_USDE_USDT_BASE_SEPOLIA: Pool = {
     address: '0xafa0e7d7f8b606eee7492395477e3176deb29f8a',
     // token0 must be the token with the smaller address
     token0: USDE_BASE_SEPOLIA, // 0x7EC...
@@ -122,6 +122,6 @@ export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
     ],
     [baseSepolia.id]: [
         POOL_USDC_USDT_BASE_SEPOLIA,
-        POOL_USDT_USDE_BASE_SEPOLIA,
+        POOL_USDE_USDT_BASE_SEPOLIA,
     ]
 };
