@@ -33,12 +33,6 @@ const Pools: React.FC = () => {
         setView('list');
     };
     
-    const handleAddLiquidityClick = () => {
-        if (availablePools.length > 0) {
-            handleSelectPoolToAdd(availablePools[0]);
-        }
-    };
-
     if (view === 'add' && selectedPool) {
         return <AddLiquidityCard pool={selectedPool} onBack={handleBack} />;
     }
@@ -49,15 +43,8 @@ const Pools: React.FC = () => {
 
     return (
         <div className="w-full max-w-2xl bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Pools</h2>
-                <button 
-                    onClick={handleAddLiquidityClick}
-                    className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                >
-                    + Add Liquidity
-                </button>
-            </div>
+            <h2 className="text-xl font-bold mb-4">Pools</h2>
+            
             {availablePools.length > 0 ? (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
