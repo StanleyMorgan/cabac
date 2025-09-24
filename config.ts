@@ -1,26 +1,26 @@
 import { sepolia, baseSepolia } from 'viem/chains';
 
 export const ERC20_ABI = [
-  {
-    "constant": true,
-    "inputs": [
-      { "name": "_owner", "type": "address" },
-      { "name": "_spender", "type": "address" }
-    ],
-    "name": "allowance",
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "type": "function"
-  },
-  {
-    "constant": false,
-    "inputs": [
-      { "name": "_spender", "type": "address" },
-      { "name": "_value", "type": "uint256" }
-    ],
-    "name": "approve",
-    "outputs": [{ "name": "", "type": "bool" }],
-    "type": "function"
-  },
+    {
+        "type": "function",
+        "name": "allowance",
+        "inputs": [
+            { "name": "owner", "type": "address", "internalType": "address" },
+            { "name": "spender", "type": "address", "internalType": "address" }
+        ],
+        "outputs": [ { "name": "", "type": "uint256", "internalType": "uint256" } ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "approve",
+        "inputs": [
+            { "name": "spender", "type": "address", "internalType": "address" },
+            { "name": "amount", "type": "uint256", "internalType": "uint256" }
+        ],
+        "outputs": [ { "name": "", "type": "bool", "internalType": "bool" } ],
+        "stateMutability": "nonpayable"
+    }
 ] as const;
 
 export const ROUTER_ABI = [

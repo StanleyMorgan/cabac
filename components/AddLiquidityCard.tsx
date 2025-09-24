@@ -143,7 +143,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         abi: ERC20_ABI,
         functionName: 'approve',
         args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] : undefined,
-        query: { enabled: !isApproval0Needed && isApproval1Needed && !!contracts?.POSITION_MANAGER },
+        query: { enabled: isApproval1Needed && !!contracts?.POSITION_MANAGER },
     });
 
     const mintParams = useMemo(() => {
