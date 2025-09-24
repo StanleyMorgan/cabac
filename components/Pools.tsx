@@ -41,14 +41,16 @@ const Pools: React.FC = () => {
                 address: pool.token0.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
                 functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`],
+                // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             } as const,
             {
                 address: pool.token1.address as `0x${string}`,
                 abi: minimalBalanceOfAbi,
                 functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`],
+                // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             } as const,
         ]);

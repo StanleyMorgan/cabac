@@ -2,7 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { useAccount, useReadContracts, useReadContract } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
 import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
-import { TOKENS_BY_CHAIN } from '../constants';
+import { POOLS_BY_CHAIN, TOKENS_BY_CHAIN } from '../constants';
 import { Token } from '../types';
 
 type PositionData = {
@@ -82,12 +82,17 @@ const MyPositions: React.FC = () => {
     const displayChainId = chainId || baseSepolia.id;
     const contracts = useMemo(() => CONTRACT_ADDRESSES[displayChainId as keyof typeof CONTRACT_ADDRESSES], [displayChainId]);
     const positionManagerAddress = contracts?.POSITION_MANAGER;
+    
+    const allPoolsForChain = useMemo(() => {
+        return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
+    }, [displayChainId]);
 
     const { data: balanceResult, isLoading: isBalanceLoading } = useReadContract({
         address: positionManagerAddress,
         abi: POSITION_MANAGER_ABI,
         functionName: 'balanceOf',
-        args: address ? [address] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: address ? [address] as const : undefined,
         chainId: displayChainId,
         query: {
             enabled: !!address && !!positionManagerAddress && isConnected,
@@ -129,7 +134,8 @@ const MyPositions: React.FC = () => {
             address: positionManagerAddress,
             abi: POSITION_MANAGER_ABI,
             functionName: 'positions',
-            args: [tokenId],
+            // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+            args: [tokenId] as const,
             chainId: displayChainId,
         } as const));
     }, [positionManagerAddress, tokenIds, displayChainId]);
@@ -147,14 +153,30 @@ const MyPositions: React.FC = () => {
                 return null;
             }
             
-            // The result from useReadContracts can be an array or an object.
-            // We handle both to be robust. `liquidity` is at index 7 in the ABI.
             const rawPos = result.result as any;
             const liquidity = rawPos.liquidity ?? rawPos[7];
 
-            // Ensure liquidity is a valid bigint before comparing.
             if (typeof liquidity !== 'bigint' || liquidity <= 0n) {
                 return null;
+            }
+            
+            const positionToken0 = (rawPos.token0 ?? rawPos[2]).toLowerCase();
+            const positionToken1 = (rawPos.token1 ?? rawPos[3]).toLowerCase();
+            const positionFee = rawPos.fee ?? rawPos[4];
+            
+            const isKnownPool = allPoolsForChain.some(pool => {
+                const poolToken0 = pool.token0.address.toLowerCase();
+                const poolToken1 = pool.token1.address.toLowerCase();
+                // Uniswap pools have token0/token1 sorted by address, which matches the position data.
+                return (
+                    positionToken0 === poolToken0 &&
+                    positionToken1 === poolToken1 &&
+                    positionFee === pool.fee
+                );
+            });
+
+            if (!isKnownPool) {
+                return null; // Filter out positions not in our constants file
             }
             
             // Construct a consistent object for rendering.
@@ -170,7 +192,7 @@ const MyPositions: React.FC = () => {
         
         // Filter out any positions that were null after parsing.
         return parsedPositions.filter((pos): pos is PositionData => pos !== null);
-    }, [positionsResults]);
+    }, [positionsResults, allPoolsForChain]);
     
     const isLoading = isBalanceLoading || areTokenIdsLoading || arePositionsLoading;
 

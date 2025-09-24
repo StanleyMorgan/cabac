@@ -135,7 +135,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         address: token0.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] as const : undefined,
         chainId,
         query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
     });
@@ -145,7 +146,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         address: token1.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] as const : undefined,
         chainId,
         query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
     });
@@ -161,7 +163,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         address: token0.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] as const : undefined,
         query: { enabled: isApproval0Needed && !!contracts?.POSITION_MANAGER }
     });
 
@@ -169,7 +172,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         address: token1.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] as const : undefined,
         query: { enabled: !isApproval0Needed && isApproval1Needed && !!contracts?.POSITION_MANAGER }
     });
 
@@ -195,7 +199,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         address: contracts?.POSITION_MANAGER,
         abi: POSITION_MANAGER_ABI,
         functionName: 'mint',
-        args: mintParams ? [mintParams] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: mintParams ? [mintParams] as const : undefined,
         query: { enabled: !!mintParams && !isApproval0Needed && !isApproval1Needed }
     });
 

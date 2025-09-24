@@ -83,7 +83,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
         functionName: 'allowance',
-        args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] as const : undefined,
         chainId: chainId,
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
@@ -95,7 +96,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         address: tokenIn?.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] as const : undefined,
         query: {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
         },
@@ -119,7 +121,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
-        args: quoteArgs ? [quoteArgs] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: quoteArgs ? [quoteArgs] as const : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
         query: {
             enabled: !!quoteArgs && !isApprovalNeeded,
@@ -144,7 +147,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
-        args: swapArgs ? [swapArgs] : undefined,
+        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
+        args: swapArgs ? [swapArgs] as const : undefined,
         value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
         query: {
             enabled: !!swapArgs && !isApprovalNeeded,
