@@ -68,7 +68,7 @@ const USDE_BASE_SEPOLIA: Token = {
     address: '0x7ECcf3461A0d9abDB4FdB26351d7022162Faba08',
     symbol: 'USDe',
     name: 'Ethena USDe',
-    logoURI: 'https://assets.coingecko.com/coins/images/35346/small/USDe_logo_200x200.png',
+    logoURI: 'https://assets.coingecko.com/coins/images/33613/small/usde.png',
     decimals: 18,
 };
 

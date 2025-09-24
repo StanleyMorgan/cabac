@@ -23,19 +23,9 @@ const BALANCE_OF_ABI = [
     }
 ] as const;
 
-// FIX: To prevent "Type instantiation is excessively deep" errors with `useReadContracts`,
-// we define a specific type for the contract call configuration and explicitly type the
-// dynamically generated array. This tells TypeScript to treat it as a simple array
-// rather than attempting to infer a complex and potentially infinitely deep tuple type.
-type BalanceOfContractConfig = {
-    address: `0x${string}`;
-    abi: typeof BALANCE_OF_ABI;
-    functionName: 'balanceOf';
-    args: readonly [`0x${string}`];
-    chainId: number;
-};
-
-
+// FIX: To prevent "Type instantiation is excessively deep" errors, removed the explicit
+// `BalanceOfContractConfig` type and allowed TypeScript to infer the array type,
+// which avoids the compiler trying to build a deep tuple type.
 // FIX: Removed the explicit `Erc20BalanceOfCall` type. Relying on TypeScript's inference
 // for the dynamically generated contract array is simpler and avoids the "excessively deep"
 // type error that occurred with explicit, complex types.
@@ -47,8 +37,8 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    const contractsToRead = useMemo((): BalanceOfContractConfig[] => {
-        const calls: BalanceOfContractConfig[] = [];
+    const contractsToRead = useMemo(() => {
+        const calls = [];
         for (const pool of basePools) {
             calls.push({
                 address: pool.token0.address as `0x${string}`,
@@ -69,7 +59,7 @@ const Pools: React.FC = () => {
     }, [basePools, displayChainId]);
 
     const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
-        // By typing `contractsToRead` as an array, we prevent TypeScript from attempting
+        // By letting TS infer `contractsToRead` as `T[]`, we prevent it from attempting
         // deep tuple type inference, which was causing the error.
         contracts: contractsToRead,
         query: { enabled: isConnected && basePools.length > 0 }
