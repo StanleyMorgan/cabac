@@ -63,7 +63,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { writeContract, data: txHash, isPending: isTxPending, reset } = useWriteContract();
     const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
-    const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    const { data: allowanceResult, refetch: refetchAllowance } = useReadContract({
         abi: ERC20_ABI,
         address: tokenIn?.address as `0x${string}`,
         functionName: 'allowance',
@@ -74,6 +74,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
         },
     });
+    const allowance = allowanceResult as bigint | undefined;
 
     // FIX: Removed generic types from useSimulateContract to allow for automatic type inference.
     const { data: approveResult } = useSimulateContract({
@@ -150,7 +151,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, [amountIn, amountOut]);
 
     useEffect(() => {
-        // FIX: Used `typeof allowance === 'bigint'` to correctly narrow the type for comparison.
         if (tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && typeof allowance === 'bigint' && amountInBigInt > 0) {
             setIsApprovalNeeded(allowance < amountInBigInt);
         } else {

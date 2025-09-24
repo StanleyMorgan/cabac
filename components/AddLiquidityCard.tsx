@@ -131,7 +131,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     }, [priceUpper, token0, token1, tickSpacing]);
     
     // Check allowances
-    const { data: allowance0, refetch: refetchAllowance0 } = useReadContract({
+    const { data: allowance0Result, refetch: refetchAllowance0 } = useReadContract({
         address: token0.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -139,8 +139,9 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         chainId,
         query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
     });
+    const allowance0 = allowance0Result as bigint | undefined;
 
-    const { data: allowance1, refetch: refetchAllowance1 } = useReadContract({
+    const { data: allowance1Result, refetch: refetchAllowance1 } = useReadContract({
         address: token1.address as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -148,6 +149,7 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         chainId,
         query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
     });
+    const allowance1 = allowance1Result as bigint | undefined;
     
     useEffect(() => {
         setIsApproval0Needed(typeof allowance0 === 'bigint' && amount0BigInt > 0n && allowance0 < amount0BigInt);

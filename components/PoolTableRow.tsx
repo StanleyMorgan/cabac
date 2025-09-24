@@ -5,6 +5,7 @@ interface PoolTableRowProps {
     pool: Pool;
     onAdd: () => void;
     onRemove: () => void;
+    isLoading?: boolean;
 }
 
 const formatCurrency = (value: number | undefined) => {
@@ -19,7 +20,13 @@ const formatCurrency = (value: number | undefined) => {
     }).format(value);
 };
 
-const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove }) => {
+const SkeletonCell: React.FC = () => (
+    <td className="p-4 text-right">
+        <div className="h-5 bg-brand-surface-2 rounded animate-pulse w-24 ml-auto" />
+    </td>
+);
+
+export const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove, isLoading = false }) => {
     const { token0, token1, tvl, myLiquidity } = pool;
 
     return (
@@ -35,23 +42,34 @@ const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove }) =>
                     </div>
                 </div>
             </td>
-            <td className="p-4 text-right font-mono text-brand-text-primary">
-                {formatCurrency(tvl)}
-            </td>
-            <td className="p-4 text-right font-mono text-brand-text-primary">
-                {formatCurrency(myLiquidity)}
-            </td>
+            {isLoading ? (
+                <>
+                    <SkeletonCell />
+                    <SkeletonCell />
+                </>
+            ) : (
+                <>
+                    <td className="p-4 text-right font-mono text-brand-text-primary">
+                        {formatCurrency(tvl)}
+                    </td>
+                    <td className="p-4 text-right font-mono text-brand-text-primary">
+                        {formatCurrency(myLiquidity)}
+                    </td>
+                </>
+            )}
             <td className="p-4 text-right">
                 <div className="flex items-center justify-end space-x-2">
                     <button 
                         onClick={onRemove}
-                        className="border border-brand-secondary hover:bg-brand-secondary text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm"
+                        disabled={isLoading}
+                        className="border border-brand-secondary hover:bg-brand-secondary text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Remove
                     </button>
                     <button 
                         onClick={onAdd}
-                        className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm"
+                        disabled={isLoading}
+                        className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Add
                     </button>
@@ -59,6 +77,4 @@ const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove }) =>
             </td>
         </tr>
     );
-}
-
-export default PoolTableRow;
+};

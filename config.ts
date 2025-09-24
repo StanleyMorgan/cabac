@@ -2,9 +2,12 @@ import { sepolia, baseSepolia } from 'viem/chains';
 
 // --- ABIs ---
 
+// FIX: Added `as const` to the ERC20_ABI. This ensures that TypeScript infers the
+// narrowest possible types for the ABI (e.g., "function" instead of string), which is
+// required for wagmi hooks like `useReadContracts` to work correctly. The "excessively
+// deep" error this might cause in dynamic contract arrays is resolved in `Pools.tsx`.
 export const ERC20_ABI = [
   {
-    "constant": true,
     "inputs": [
       {
         "name": "_owner",
@@ -22,12 +25,10 @@ export const ERC20_ABI = [
         "type": "uint256"
       }
     ],
-    "payable": false,
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "constant": false,
     "inputs": [
       {
         "name": "_spender",
@@ -45,8 +46,24 @@ export const ERC20_ABI = [
         "type": "bool"
       }
     ],
-    "payable": false,
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+        {
+            "name": "_owner",
+            "type": "address"
+        }
+    ],
+    "name": "balanceOf",
+    "outputs": [
+        {
+            "name": "balance",
+            "type": "uint256"
+        }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const;
