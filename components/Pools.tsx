@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useAccount, useReadContracts } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
-// FIX: Removed unused `Abi` import after refactoring to let TypeScript infer contract types.
 import { formatUnits } from 'viem';
 import { POOLS_BY_CHAIN } from '../constants';
 import { Pool } from '../types';
@@ -10,10 +9,10 @@ import AddLiquidityCard from './AddLiquidityCard';
 import RemoveLiquidityCard from './RemoveLiquidityCard';
 import { RefreshIcon } from './icons/RefreshIcon';
 
-// FIX: Define a simpler ABI containing only the 'balanceOf' function to reduce
-// type complexity for the TypeScript compiler, which can help prevent the
-// "Type instantiation is excessively deep" error with `useReadContracts`.
-const BALANCE_OF_ABI = [
+// FIX: To prevent a TypeScript error "Type instantiation is excessively deep" with `useReadContracts`,
+// we define a minimal ABI containing only the `balanceOf` function. This simplifies the type
+// that TypeScript needs to process for each item in the dynamic array of contracts.
+const minimalBalanceOfAbi = [
     {
         "inputs": [ { "name": "_owner", "type": "address" } ],
         "name": "balanceOf",
@@ -23,12 +22,18 @@ const BALANCE_OF_ABI = [
     }
 ] as const;
 
-// FIX: To prevent "Type instantiation is excessively deep" errors, removed the explicit
-// `BalanceOfContractConfig` type and allowed TypeScript to infer the array type,
-// which avoids the compiler trying to build a deep tuple type.
-// FIX: Removed the explicit `Erc20BalanceOfCall` type. Relying on TypeScript's inference
-// for the dynamically generated contract array is simpler and avoids the "excessively deep"
-// type error that occurred with explicit, complex types.
+// FIX: Define a specific type for the contract calls to prevent a TypeScript error
+// "Type instantiation is excessively deep and possibly infinite" when using useReadContracts
+// with a dynamically generated array of contracts. Using a minimal ABI type here is key.
+type BalanceOfContractCall = {
+    address: `0x${string}`;
+    abi: typeof minimalBalanceOfAbi;
+    functionName: 'balanceOf';
+    args: readonly [`0x${string}`];
+    chainId: number;
+};
+
+
 const Pools: React.FC = () => {
     const { chainId, isConnected } = useAccount();
     const displayChainId = chainId || baseSepolia.id;
@@ -37,31 +42,30 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    // FIX: Switched from a for-loop with .push() to .flatMap() to build the contracts array.
-    // This helps TypeScript infer the type as a simple array (T[]) rather than a complex,
-    // potentially huge tuple type, which was causing the "Type instantiation is excessively deep" error.
+    // FIX: Switched from `flatMap` to `reduce` with an explicitly typed accumulator.
+    // This helps TypeScript infer the type of the `contracts` array correctly for `useReadContracts`
+    // without getting into a deep recursion, thus resolving the type error and allowing removal of `as any`.
     const contractsToRead = useMemo(() => {
-        return basePools.flatMap((pool) => [
-            {
+        return basePools.reduce<BalanceOfContractCall[]>((acc, pool) => {
+            acc.push({
                 address: pool.token0.address as `0x${string}`,
-                abi: BALANCE_OF_ABI,
+                abi: minimalBalanceOfAbi,
                 functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`] as const,
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
-            },
-            {
+            });
+            acc.push({
                 address: pool.token1.address as `0x${string}`,
-                abi: BALANCE_OF_ABI,
+                abi: minimalBalanceOfAbi,
                 functionName: 'balanceOf',
-                args: [pool.address as `0x${string}`] as const,
+                args: [pool.address as `0x${string}`],
                 chainId: displayChainId,
-            },
-        ]);
+            });
+            return acc;
+        }, []);
     }, [basePools, displayChainId]);
 
     const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
-        // By letting TS infer `contractsToRead` as `T[]`, we prevent it from attempting
-        // deep tuple type inference, which was causing the error.
         contracts: contractsToRead,
         query: { enabled: isConnected && basePools.length > 0 }
     });
