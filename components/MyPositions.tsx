@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useAccount, useReadContracts, useReadContract } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
 import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
@@ -144,11 +144,41 @@ const MyPositions: React.FC = () => {
             .map(result => result.result as PositionData);
     }, [positionsResults]);
     
+    const isLoading = isBalanceLoading || areTokenIdsLoading || arePositionsLoading;
+
+    useEffect(() => {
+        console.groupCollapsed("%c 🔍 My Positions Diagnostics ", "color: #FFA500; font-weight: bold;");
+        console.log("Is Connected:", isConnected);
+        console.log("Chain ID:", displayChainId);
+        console.log("User Address:", address);
+        console.log("Position Manager Address:", positionManagerAddress);
+        console.log("--- 1. Fetching Position Count (balanceOf) ---");
+        console.log("Is Loading:", isBalanceLoading);
+        console.log("Count:", positionCount);
+        console.log("--- 2. Fetching Token IDs (tokenOfOwnerByIndex) ---");
+        console.log("Is Loading:", areTokenIdsLoading);
+        console.log("Contracts Sent:", tokenIdsContracts);
+        console.log("Raw Results:", tokenIdsResults);
+        console.log("Processed Token IDs:", tokenIds);
+        console.log("--- 3. Fetching Position Details (positions) ---");
+        console.log("Is Loading:", arePositionsLoading);
+        console.log("Contracts Sent:", positionsContracts);
+        console.log("Raw Results:", positionsResults);
+        console.log("--- 4. Final Processed Positions ---");
+        console.log("Filtered Positions (liquidity > 0):", positions);
+        console.log("Final Loading State:", isLoading);
+        console.groupEnd();
+    }, [
+        isConnected, displayChainId, address, positionManagerAddress,
+        isBalanceLoading, positionCount,
+        areTokenIdsLoading, tokenIdsContracts, tokenIdsResults, tokenIds,
+        arePositionsLoading, positionsContracts, positionsResults, positions,
+        isLoading
+    ]);
+    
     if (!isConnected) {
         return null; // Don't show the block if wallet is not connected
     }
-
-    const isLoading = isBalanceLoading || areTokenIdsLoading || arePositionsLoading;
 
     return (
         <div className="bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
