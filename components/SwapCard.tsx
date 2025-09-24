@@ -10,7 +10,7 @@ import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, formatUnits, maxUint256 } from 'viem';
+import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
 interface SwapCardProps {
@@ -114,7 +114,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt, selectedPool]);
 
-    const { data: quoteResult, isLoading: isQuoteLoading } = useSimulateContract({
+    const { data: quoteResult, isLoading: isQuoteLoading, error: quoteError } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
@@ -139,7 +139,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
     }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum, selectedPool]);
 
-    const { data: swapResult } = useSimulateContract({
+    const { data: swapResult, error: swapError } = useSimulateContract({
         address: contracts?.ROUTER,
         abi: ROUTER_ABI,
         functionName: 'exactInputSingle',
@@ -175,9 +175,15 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 setAmountOut(formattedAmount);
                 const newAmountOutMinimum = quoteAmount * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
                 setAmountOutMinimum(newAmountOutMinimum);
+            } else {
+                setAmountOut('0.0');
+                setAmountOutMinimum(0n);
             }
+        } else if (quoteError) {
+             setAmountOut('0.0');
+             setAmountOutMinimum(0n);
         }
-    }, [quoteResult, tokenOut, slippage]);
+    }, [quoteResult, tokenOut, slippage, quoteError]);
 
 
     useEffect(() => {
@@ -252,6 +258,48 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter an amount';
         return 'Swap';
     };
+    
+    // Diagnostic logging
+    useEffect(() => {
+        console.groupCollapsed("%c 🔄 Swap Diagnostics ", "color: #4C82FB; font-weight: bold;");
+        console.log("Chain ID:", chainId);
+        console.log("User Address:", address);
+        console.log("Is Supported Chain:", isSupportedChain);
+        console.log("Contracts:", contracts);
+        console.log("--- Tokens & Amounts ---");
+        console.log("Token In:", tokenIn?.symbol, tokenIn);
+        console.log("Token Out:", tokenOut?.symbol, tokenOut);
+        console.log("Amount In:", { input: amountIn, bigint: amountInBigInt.toString() });
+        console.log("Amount Out:", amountOut);
+        console.log("--- Pool ---");
+        console.log("Selected Pool:", selectedPool);
+        console.log("--- Allowance ---");
+        console.log("Allowance:", typeof allowance === 'bigint' ? formatUnits(allowance, tokenIn?.decimals || 18) : allowance);
+        console.log("Is Approval Needed:", isApprovalNeeded);
+        console.log("--- Quote Simulation ---");
+        console.log("Quote Args:", quoteArgs);
+        console.log("Is Quote Loading:", isQuoteLoading);
+        const qError = (quoteError as BaseError)?.shortMessage || quoteError?.message;
+        console.log("Quote Sim Result:", { result: quoteResult?.result, error: qError });
+        console.log("--- Swap Simulation ---");
+        console.log("Amount Out Minimum:", amountOutMinimum.toString());
+        console.log("Swap Args:", swapArgs);
+        const sError = (swapError as BaseError)?.shortMessage || swapError?.message;
+        console.log("Swap Sim Result:", { request: swapResult?.request, error: sError });
+        console.log("--- Transaction ---");
+        console.log("Tx Pending:", isTxPending);
+        console.log("Tx Confirming:", isTxConfirming);
+        console.log("Tx Hash:", txHash);
+        console.log("--- Button State ---");
+        const isButtonDisabled = (isWalletConnected && (!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request || !selectedPool)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)));
+        console.log("Button Text:", getButtonText());
+        console.log("Button Disabled:", isButtonDisabled);
+        console.groupEnd();
+    }, [
+        chainId, address, isSupportedChain, contracts, tokenIn, tokenOut, amountIn, amountInBigInt, amountOut,
+        selectedPool, allowance, isApprovalNeeded, quoteArgs, isQuoteLoading, quoteResult, quoteError, amountOutMinimum,
+        swapArgs, swapResult, swapError, isTxPending, isTxConfirming, txHash, approveResult, isWalletConnected
+    ]);
     
     if (isWalletConnected && (!isSupportedChain || !tokenIn || !tokenOut)) {
        return (

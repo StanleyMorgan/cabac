@@ -102,7 +102,7 @@ const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
     // token0 must be the token with the smaller address
     token0: USDC_BASE_SEPOLIA, // 0x4b1...
     token1: USDT_BASE_SEPOLIA, // 0xAFf...
-    fee: 500, // 0.05% fee tier, common for stable pairs
+    fee: 3000, // 0.3% fee tier
     myLiquidity: 0,
 };
 

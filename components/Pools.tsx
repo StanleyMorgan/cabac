@@ -33,7 +33,8 @@ type Erc20BalanceOfCall = {
     // code already casts the result, so this is safe.
     abi: Abi;
     functionName: 'balanceOf';
-    args: readonly [`0x${string}`];
+    // FIX: Changed args to `readonly unknown[]` to reduce type complexity and prevent "Type instantiation is excessively deep" error.
+    args: readonly unknown[];
     chainId: number;
 };
 
