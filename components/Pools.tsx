@@ -37,25 +37,26 @@ const Pools: React.FC = () => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
+    // FIX: Switched from a for-loop with .push() to .flatMap() to build the contracts array.
+    // This helps TypeScript infer the type as a simple array (T[]) rather than a complex,
+    // potentially huge tuple type, which was causing the "Type instantiation is excessively deep" error.
     const contractsToRead = useMemo(() => {
-        const calls = [];
-        for (const pool of basePools) {
-            calls.push({
+        return basePools.flatMap((pool) => [
+            {
                 address: pool.token0.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
                 args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
-            });
-            calls.push({
+            },
+            {
                 address: pool.token1.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
                 args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
-            });
-        }
-        return calls;
+            },
+        ]);
     }, [basePools, displayChainId]);
 
     const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
