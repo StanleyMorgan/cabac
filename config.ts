@@ -2,13 +2,12 @@ import { sepolia, baseSepolia } from 'viem/chains';
 
 // --- ABIs ---
 
-// FIX: Added 'balanceOf' to the ABI to fix a type inference issue with wagmi's useReadContracts hook.
+// FIX: Updated the ABI to a modern format to fix a type inference issue with wagmi's useReadContracts hook.
 export const ERC20_ABI = [
   {
-    "constant": true,
     "inputs": [
       {
-        "name": "_owner",
+        "name": "owner",
         "type": "address"
       }
     ],
@@ -19,19 +18,17 @@ export const ERC20_ABI = [
         "type": "uint256"
       }
     ],
-    "payable": false,
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "constant": true,
     "inputs": [
       {
-        "name": "_owner",
+        "name": "owner",
         "type": "address"
       },
       {
-        "name": "_spender",
+        "name": "spender",
         "type": "address"
       }
     ],
@@ -42,19 +39,17 @@ export const ERC20_ABI = [
         "type": "uint256"
       }
     ],
-    "payable": false,
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "constant": false,
     "inputs": [
       {
-        "name": "_spender",
+        "name": "spender",
         "type": "address"
       },
       {
-        "name": "_value",
+        "name": "value",
         "type": "uint256"
       }
     ],
@@ -65,7 +60,6 @@ export const ERC20_ABI = [
         "type": "bool"
       }
     ],
-    "payable": false,
     "stateMutability": "nonpayable",
     "type": "function"
   }

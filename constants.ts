@@ -49,7 +49,7 @@ const WETH_BASE_SEPOLIA: Token = {
 };
 
 const USDC_BASE_SEPOLIA: Token = {
-    address: '0x3BF92B07DB657f5853d054d38fA24Bd654827437',
+    address: '0x4b1a87123583b2E630152668a2c2fABb44b32F36',
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
@@ -57,7 +57,7 @@ const USDC_BASE_SEPOLIA: Token = {
 };
 
 const USDT_BASE_SEPOLIA: Token = {
-    address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9',
+    address: '0xAFf0958d14195ccC4Cb9c7Dd221eE89fd9a54470',
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
@@ -65,7 +65,7 @@ const USDT_BASE_SEPOLIA: Token = {
 };
 
 const USDE_BASE_SEPOLIA: Token = {
-    address: '0x696c86d7dfb1Fea3fd3c900F480E536eD16E4780',
+    address: '0x7ECcf3461A0d9abDB4FdB26351d7022162Faba08',
     symbol: 'USDe',
     name: 'Ethena USDe',
     logoURI: 'https://assets.coingecko.com/coins/images/35346/small/USDe_logo_200x200.png',
@@ -98,19 +98,19 @@ const POOL_WETH_USDC_SEPOLIA: Pool = {
 };
 
 const POOL_USDC_USDT_BASE_SEPOLIA: Pool = {
-    address: '0xDA84d2f810f682fb392CA1126CAe7462542B0903',
+    address: '0x9c48fB7a9481c9E57E900B35E41dc312A6323C92',
     // token0 must be the token with the smaller address
-    token0: USDT_BASE_SEPOLIA, // 0x2c0...
-    token1: USDC_BASE_SEPOLIA, // 0x3BF...
+    token0: USDC_BASE_SEPOLIA, // 0x4b1...
+    token1: USDT_BASE_SEPOLIA, // 0xAFf...
     tvl: 5430123.88,
     myLiquidity: 12345.67,
 };
 
-const POOL_USDC_USDE_BASE_SEPOLIA: Pool = {
-    address: '0xb823743A160a119597bf0Cf4De9778BBBFeefe26',
+const POOL_USDT_USDE_BASE_SEPOLIA: Pool = {
+    address: '0xafa0e7d7f8b606eee7492395477e3176deb29f8a',
     // token0 must be the token with the smaller address
-    token0: USDC_BASE_SEPOLIA, // 0x3BF...
-    token1: USDE_BASE_SEPOLIA, // 0x696...
+    token0: USDE_BASE_SEPOLIA, // 0x7EC...
+    token1: USDT_BASE_SEPOLIA, // 0xAFf...
     tvl: 890456.12,
     myLiquidity: 0,
 };
@@ -122,6 +122,6 @@ export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
     ],
     [baseSepolia.id]: [
         POOL_USDC_USDT_BASE_SEPOLIA,
-        POOL_USDC_USDE_BASE_SEPOLIA,
+        POOL_USDT_USDE_BASE_SEPOLIA,
     ]
 };
