@@ -12,7 +12,6 @@ type PositionData = {
     tickLower: number;
     tickUpper: number;
     liquidity: bigint;
-    [key: string]: any;
 };
 
 // Helper to create a fallback token object for tokens not in our constants list
@@ -100,13 +99,14 @@ const MyPositions: React.FC = () => {
 
     const tokenIdsContracts = useMemo(() => {
         if (!address || !positionManagerAddress || positionCount === 0) return [];
+        // FIX: Add `as const` to ensure proper type inference for useReadContracts.
         return Array.from({ length: positionCount }, (_, index) => ({
             address: positionManagerAddress,
             abi: POSITION_MANAGER_ABI,
             functionName: 'tokenOfOwnerByIndex',
             args: [address, BigInt(index)] as const,
             chainId: displayChainId,
-        }));
+        } as const));
     }, [address, positionManagerAddress, positionCount, displayChainId]);
 
     const { data: tokenIdsResults, isLoading: areTokenIdsLoading } = useReadContracts({
@@ -123,13 +123,15 @@ const MyPositions: React.FC = () => {
 
     const positionsContracts = useMemo(() => {
         if (!positionManagerAddress || tokenIds.length === 0) return [];
+        // FIX: Add `as const` to fix the "Property 'result' does not exist on type 'never'" error
+        // by allowing wagmi's `useReadContracts` hook to correctly infer the return type.
         return tokenIds.map(tokenId => ({
             address: positionManagerAddress,
             abi: POSITION_MANAGER_ABI,
             functionName: 'positions',
             args: [tokenId],
             chainId: displayChainId,
-        }));
+        } as const));
     }, [positionManagerAddress, tokenIds, displayChainId]);
 
     const { data: positionsResults, isLoading: arePositionsLoading } = useReadContracts({
@@ -139,9 +141,35 @@ const MyPositions: React.FC = () => {
 
     const positions = useMemo(() => {
         if (!positionsResults) return [];
-        return positionsResults
-            .filter(result => result.status === 'success' && (result.result as PositionData).liquidity > 0n)
-            .map(result => result.result as PositionData);
+
+        const parsedPositions = positionsResults.map(result => {
+            if (result.status !== 'success' || !result.result) {
+                return null;
+            }
+            
+            // The result from useReadContracts can be an array or an object.
+            // We handle both to be robust. `liquidity` is at index 7 in the ABI.
+            const rawPos = result.result as any;
+            const liquidity = rawPos.liquidity ?? rawPos[7];
+
+            // Ensure liquidity is a valid bigint before comparing.
+            if (typeof liquidity !== 'bigint' || liquidity <= 0n) {
+                return null;
+            }
+            
+            // Construct a consistent object for rendering.
+            return {
+                token0: rawPos.token0 ?? rawPos[2],
+                token1: rawPos.token1 ?? rawPos[3],
+                fee: rawPos.fee ?? rawPos[4],
+                tickLower: rawPos.tickLower ?? rawPos[5],
+                tickUpper: rawPos.tickUpper ?? rawPos[6],
+                liquidity: liquidity,
+            } as PositionData;
+        });
+        
+        // Filter out any positions that were null after parsing.
+        return parsedPositions.filter((pos): pos is PositionData => pos !== null);
     }, [positionsResults]);
     
     const isLoading = isBalanceLoading || areTokenIdsLoading || arePositionsLoading;
@@ -157,15 +185,15 @@ const MyPositions: React.FC = () => {
         console.log("Count:", positionCount);
         console.log("--- 2. Fetching Token IDs (tokenOfOwnerByIndex) ---");
         console.log("Is Loading:", areTokenIdsLoading);
-        console.log("Contracts Sent:", tokenIdsContracts);
+        console.log("Contracts Sent:", tokenIdsContracts.length);
         console.log("Raw Results:", tokenIdsResults);
-        console.log("Processed Token IDs:", tokenIds);
+        console.log("Processed Token IDs:", tokenIds.map(id => id.toString()));
         console.log("--- 3. Fetching Position Details (positions) ---");
         console.log("Is Loading:", arePositionsLoading);
-        console.log("Contracts Sent:", positionsContracts);
+        console.log("Contracts Sent:", positionsContracts.length);
         console.log("Raw Results:", positionsResults);
         console.log("--- 4. Final Processed Positions ---");
-        console.log("Filtered Positions (liquidity > 0):", positions);
+        console.log("Filtered & Parsed Positions:", positions);
         console.log("Final Loading State:", isLoading);
         console.groupEnd();
     }, [
@@ -190,7 +218,8 @@ const MyPositions: React.FC = () => {
             ) : positions.length > 0 ? (
                 <div className="space-y-3">
                     {positions.map((pos, index) => (
-                        <PositionItem key={index} positionData={pos} />
+                        // Use a more stable key if possible, e.g., combining token addresses and ticks
+                        <PositionItem key={`${pos.token0}-${pos.token1}-${pos.tickLower}-${index}`} positionData={pos} />
                     ))}
                 </div>
             ) : (
