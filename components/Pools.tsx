@@ -45,20 +45,22 @@ const Pools: React.FC = () => {
                 address: pool.token0.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Removed `as const` from the `args` array. While `as const` helps wagmi with
-                // type inference by creating a narrow tuple type, it was too complex for TypeScript
-                // to handle in this dynamically generated array, causing the "excessively deep" error.
-                args: [pool.address as `0x${string}`],
+                // FIX: Re-added `as const` to the `args` array. This provides wagmi with a
+                // narrow tuple type, which is essential for correct type inference on the hook's
+                // return value. The "excessively deep" error is avoided by other changes,
+                // like using a simpler ABI and an imperative loop.
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             });
             calls.push({
                 address: pool.token1.address as `0x${string}`,
                 abi: BALANCE_OF_ABI,
                 functionName: 'balanceOf',
-                // FIX: Removed `as const` from the `args` array. While `as const` helps wagmi with
-                // type inference by creating a narrow tuple type, it was too complex for TypeScript
-                // to handle in this dynamically generated array, causing the "excessively deep" error.
-                args: [pool.address as `0x${string}`],
+                // FIX: Re-added `as const` to the `args` array. This provides wagmi with a
+                // narrow tuple type, which is essential for correct type inference on the hook's
+                // return value. The "excessively deep" error is avoided by other changes,
+                // like using a simpler ABI and an imperative loop.
+                args: [pool.address as `0x${string}`] as const,
                 chainId: displayChainId,
             });
         }
