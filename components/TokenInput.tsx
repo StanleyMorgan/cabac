@@ -11,6 +11,7 @@ interface TokenInputProps {
   balance?: string;
   isBalanceLoading: boolean;
   isOutput?: boolean;
+  isQuoteLoading?: boolean;
 }
 
 const TokenInput: React.FC<TokenInputProps> = ({
@@ -21,7 +22,8 @@ const TokenInput: React.FC<TokenInputProps> = ({
   onTokenSelect,
   balance,
   isBalanceLoading,
-  isOutput = false
+  isOutput = false,
+  isQuoteLoading = false,
 }) => {
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Allow only numbers and a single decimal point
@@ -44,21 +46,25 @@ const TokenInput: React.FC<TokenInputProps> = ({
         </span>
       </div>
       <div className="flex justify-between items-center">
-        <input
-          type="text"
-          inputMode="decimal"
-          placeholder="0.0"
-          className="bg-transparent text-3xl font-mono focus:outline-none w-full text-brand-text-primary"
-          value={amount}
-          onChange={handleAmountChange}
-          readOnly={isOutput}
-        />
+        {isQuoteLoading ? (
+             <div className="h-9 w-2/3 bg-brand-secondary rounded animate-pulse" />
+        ) : (
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.0"
+              className="bg-transparent text-3xl font-mono focus:outline-none w-full text-brand-text-primary"
+              value={amount}
+              onChange={handleAmountChange}
+              readOnly={isOutput}
+            />
+        )}
         <button
           onClick={onTokenSelect}
           className="flex items-center space-x-2 bg-brand-secondary hover:bg-gray-700 p-2 rounded-full transition-colors"
         >
-          <img src={token.logoURI} alt={token.name} className="w-6 h-6 rounded-full" />
-          <span className="font-bold text-lg">{token.symbol}</span>
+          {token?.logoURI && <img src={token.logoURI} alt={token.name} className="w-6 h-6 rounded-full" />}
+          <span className="font-bold text-lg">{token?.symbol}</span>
           <ChevronDownIcon className="w-5 h-5 text-brand-text-secondary" />
         </button>
       </div>

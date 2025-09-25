@@ -3,7 +3,7 @@ import { useAccount, useBalance, usePublicClient, useWalletClient } from 'wagmi'
 import { formatUnits, parseUnits } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import type { Token } from '../types';
-import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
+import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
 import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI } from '../config';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAppKit } from '@reown/appkit/react';
@@ -27,6 +27,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const chainId = chain?.id ?? baseSepolia.id;
     const tokens = useMemo(() => TOKENS_BY_CHAIN[chainId] || [], [chainId]);
+    const pools = useMemo(() => POOLS_BY_CHAIN[chainId] || [], [chainId]);
 
     const [tokenIn, setTokenIn] = useState<Token>(tokens[0] || {} as Token);
     const [tokenOut, setTokenOut] = useState<Token>(tokens[1] || {} as Token);
@@ -42,6 +43,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     
     const [isApproving, setIsApproving] = useState(false);
     const [isSwapping, setIsSwapping] = useState(false);
+    const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const { data: balanceIn, isLoading: isBalanceInLoading, refetch: refetchBalanceIn } = useBalance({
@@ -56,34 +58,74 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     });
 
     useEffect(() => {
-        console.log(`Balance In for ${tokenIn?.symbol}:`, {
-            balance: balanceIn?.formatted,
-            isLoading: isBalanceInLoading,
-        });
-    }, [balanceIn, isBalanceInLoading, tokenIn?.symbol]);
-
-    useEffect(() => {
-        console.log(`Balance Out for ${tokenOut?.symbol}:`, {
-            balance: balanceOut?.formatted,
-            isLoading: isBalanceOutLoading,
-        });
-    }, [balanceOut, isBalanceOutLoading, tokenOut?.symbol]);
-
-    useEffect(() => {
-        if (tokens.length > 0) {
+        if (tokens.length > 1 && (!tokenIn.address || !tokenOut.address)) {
             setTokenIn(tokens[0]);
             setTokenOut(tokens[1]);
         }
-    }, [tokens]);
+    }, [tokens, tokenIn, tokenOut]);
 
     useEffect(() => {
-        // Simple 1:1 price simulation for demo purposes
-        if (debouncedAmountIn) {
-             setAmountOut(debouncedAmountIn);
-        } else {
-            setAmountOut('');
-        }
-    }, [debouncedAmountIn, tokenIn, tokenOut]);
+        const getQuote = async () => {
+            if (!publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address || !chain) {
+                setAmountOut('');
+                return;
+            }
+
+            setIsQuoteLoading(true);
+            setError(null);
+            try {
+                const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
+                const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+
+                if (!routerAddress) {
+                    throw new Error(`Router address not found for chain ${chain.id}`);
+                }
+                
+                const pool = pools.find(p => 
+                    (p.token0.address.toLowerCase() === tokenIn.address.toLowerCase() && p.token1.address.toLowerCase() === tokenOut.address.toLowerCase()) ||
+                    (p.token0.address.toLowerCase() === tokenOut.address.toLowerCase() && p.token1.address.toLowerCase() === tokenIn.address.toLowerCase())
+                );
+                
+                if (!pool) {
+                    setError("No pool available for this pair.");
+                    setAmountOut('');
+                    setIsQuoteLoading(false);
+                    return;
+                }
+
+                const swapParams = {
+                    tokenIn: tokenIn.address as `0x${string}`,
+                    tokenOut: tokenOut.address as `0x${string}`,
+                    fee: pool.fee,
+                    recipient: address || '0x0000000000000000000000000000000000000000',
+                    deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+                    amountIn: amountInParsed,
+                    amountOutMinimum: 0n,
+                    sqrtPriceLimitX96: 0n,
+                };
+                
+                const { result: quotedAmountOut } = await publicClient.simulateContract({
+                    account: address || '0x0000000000000000000000000000000000000000',
+                    address: routerAddress,
+                    abi: ROUTER_ABI,
+                    functionName: 'exactInputSingle',
+                    args: [swapParams],
+                    value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : 0n,
+                });
+                
+                setAmountOut(formatUnits(quotedAmountOut as bigint, tokenOut.decimals));
+
+            } catch (err) {
+                console.error("Failed to get quote:", err);
+                setAmountOut('');
+                setError("Could not fetch a quote. The pool may have low liquidity.");
+            } finally {
+                setIsQuoteLoading(false);
+            }
+        };
+
+        getQuote();
+    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools]);
 
     const handleTokenSelect = (token: Token) => {
         if (selectingFor === 'in') {
@@ -97,6 +139,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             }
             setTokenOut(token);
         }
+        setAmountIn('');
+        setAmountOut('');
         setTokenSelectorOpen(false);
     };
 
@@ -108,13 +152,23 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     };
 
     const handleSwap = async () => {
-        if (!walletClient || !address || !chain || !publicClient) return;
+        if (!walletClient || !address || !chain || !publicClient || !amountOut || isQuoteLoading) return;
 
         setError(null);
         
         try {
             const amountInParsed = parseUnits(amountIn, tokenIn.decimals);
             const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+            
+            const pool = pools.find(p => 
+                (p.token0.address.toLowerCase() === tokenIn.address.toLowerCase() && p.token1.address.toLowerCase() === tokenOut.address.toLowerCase()) ||
+                (p.token0.address.toLowerCase() === tokenOut.address.toLowerCase() && p.token1.address.toLowerCase() === tokenIn.address.toLowerCase())
+            );
+
+            if (!pool) {
+                setError("No liquidity pool found for this pair.");
+                return;
+            }
             
             if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
                 setIsApproving(true);
@@ -144,13 +198,16 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             }
 
             setIsSwapping(true);
-            const amountOutMinimum = parseUnits(amountOut, tokenOut.decimals) * BigInt(10000 - Math.floor(slippage * 100)) / BigInt(10000);
+            const amountOutParsed = parseUnits(amountOut, tokenOut.decimals);
+            const slippageTolerance = BigInt(10000 - Math.floor(slippage * 100)); // e.g. 0.5% -> 9950
+            const amountOutMinimum = (amountOutParsed * slippageTolerance) / 10000n;
+
 
             // FIX: Ensure deadline and sqrtPriceLimitX96 are bigints.
             const swapParams = {
                 tokenIn: tokenIn.address as `0x${string}`,
                 tokenOut: tokenOut.address as `0x${string}`,
-                fee: 3000,
+                fee: pool.fee,
                 recipient: address,
                 deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20), // 20 minutes from now
                 amountIn: amountInParsed,
@@ -165,7 +222,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 abi: ROUTER_ABI,
                 functionName: 'exactInputSingle',
                 args: [swapParams],
-                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : BigInt(0),
+                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : 0n,
                 chain,
                 account: address,
             });
@@ -188,6 +245,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const isButtonDisabled = isWalletConnected && (
         !amountIn || 
+        !amountOut ||
+        isQuoteLoading ||
         isApproving || 
         isSwapping || 
         parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')
@@ -195,10 +254,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const buttonText = () => {
         if (!isWalletConnected) return 'Connect Wallet';
+        if (isQuoteLoading) return 'Fetching price...';
         if (isApproving) return 'Approving...';
         if (isSwapping) return 'Swapping...';
         if (!amountIn) return 'Enter an amount';
-         if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
+        if (parseFloat(amountIn) > 0 && !amountOut && !error) return 'Getting quote...';
+        if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
         return 'Swap';
     };
 
@@ -219,7 +280,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     label="You pay"
                     token={tokenIn}
                     amount={amountIn}
-                    onAmountChange={setAmountIn}
+                    onAmountChange={(val) => { setAmountIn(val); setError(null); }}
                     onTokenSelect={() => { setSelectingFor('in'); setTokenSelectorOpen(true); }}
                     balance={balanceIn?.formatted}
                     isBalanceLoading={isBalanceInLoading}
@@ -240,6 +301,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     balance={balanceOut?.formatted}
                     isBalanceLoading={isBalanceOutLoading}
                     isOutput={true}
+                    isQuoteLoading={isQuoteLoading}
                 />
             </div>
             <button
