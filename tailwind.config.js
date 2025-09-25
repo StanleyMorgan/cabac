@@ -4,6 +4,8 @@ export default {
     "./index.html",
     "./*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",
+    // FIX: Added hooks directory to be scanned for Tailwind classes.
+    "./hooks/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
