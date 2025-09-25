@@ -64,9 +64,9 @@ const Pools: React.FC = () => {
             ]);
             
             // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall, similar to MyPositions.tsx.
+            // FIX: The `multicall` function does not accept an `authorizationList` parameter. Removing it to fix the type error.
             const results = await publicClient.multicall({
                 contracts: contractsToRead as any,
-                authorizationList: [],
             });
 
             setBalanceResults(results.map(r => r.status === 'success' ? r.result as bigint : undefined));

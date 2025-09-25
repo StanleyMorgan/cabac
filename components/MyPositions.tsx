@@ -121,7 +121,8 @@ const MyPositions: React.FC = () => {
                 args: [address, BigInt(index)],
             }));
 
-            const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsContracts, authorizationList: [] });
+            // FIX: The `multicall` function does not accept an `authorizationList` parameter. Removing it to fix the type error.
+            const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsContracts });
             const tokenIds = tokenIdsResults
                 .filter(r => r.status === 'success' && r.result)
                 .map(r => r.result as bigint);
@@ -139,7 +140,8 @@ const MyPositions: React.FC = () => {
                 args: [tokenId],
             }));
             // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall.
-            const positionsResults = await publicClient.multicall({ contracts: positionsContracts as any, authorizationList: [] });
+            // FIX: The `multicall` function does not accept an `authorizationList` parameter. Removing it to fix the type error.
+            const positionsResults = await publicClient.multicall({ contracts: positionsContracts as any });
 
             // 4. Parse and filter results
             const parsedPositions = positionsResults.map(result => {

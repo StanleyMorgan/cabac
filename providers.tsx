@@ -1,17 +1,42 @@
-
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { sepolia, baseSepolia, celo as celoMainnet } from '@reown/appkit/networks'; // Celo Sepolia is not exported, using Celo mainnet as placeholder
+import { sepolia as sepoliaBase, baseSepolia as baseSepoliaBase } from 'viem/chains';
 import type { Chain } from 'viem';
 
-// 1. Get Project ID from environment variables
+// 1. Get Project ID and Alchemy Key from environment variables
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+
 if (!projectId) {
   throw new Error("VITE_WALLETCONNECT_PROJECT_ID is not set in .env");
 }
+if (!alchemyApiKey) {
+    throw new Error("VITE_ALCHEMY_API_KEY is not set in .env");
+}
+
+// Manually configure chains with our Alchemy RPC endpoints for reliable data fetching
+const sepolia: Chain = {
+    ...sepoliaBase,
+    rpcUrls: {
+        ...sepoliaBase.rpcUrls,
+        default: {
+            http: [`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`],
+        },
+    }
+};
+
+const baseSepolia: Chain = {
+    ...baseSepoliaBase,
+    rpcUrls: {
+        ...baseSepoliaBase.rpcUrls,
+        default: {
+            http: [`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`],
+        },
+    }
+};
 
 // Celo Sepolia is not in the default exports, so we define it manually.
 const celoSepolia: Chain = {

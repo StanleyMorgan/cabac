@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
@@ -15,7 +12,7 @@ import { RefreshIcon } from './icons/RefreshIcon';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { useConnect } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
 
 
 interface SwapCardProps {
@@ -23,7 +20,7 @@ interface SwapCardProps {
 }
 
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
-    const { connect, connectors } = useConnect();
+    const { open: openWalletModal } = useAppKit();
     const { address, chain } = useAccount();
     const chainId = chain?.id;
     
@@ -393,11 +390,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }
     
     const handleConnect = () => {
-        // Find the first available connector and connect.
-        const connector = connectors.find(c => c.ready);
-        if (connector) {
-            connect({ connector });
-        }
+        openWalletModal();
     };
 
 
