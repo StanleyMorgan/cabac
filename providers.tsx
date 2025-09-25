@@ -1,56 +1,58 @@
 import React from 'react';
-import { WagmiProvider, http } from 'wagmi';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { WagmiProvider, http, createConfig } from 'wagmi';
+import { mainnet } from 'viem/chains'; // ← Начните с одной простой сети
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createAppKit } from '@reown/appkit/react';
-import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+
+// ВРЕМЕННО: Уберите AppKit полностью для теста
+// import { createAppKit } from '@reown/appkit/react';
+// import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 
 console.log("providers.tsx: Module loading...");
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
 
-console.log(`providers.tsx: Checking for environment variables...`);
-console.log(`providers.tsx: VITE_WALLETCONNECT_PROJECT_ID is ${projectId ? 'found' : 'MISSING'}.`);
-console.log(`providers.tsx: VITE_ALCHEMY_API_KEY is ${alchemyApiKey ? 'found' : 'MISSING'}.`);
-
 if (!projectId || !alchemyApiKey) {
-    console.error("providers.tsx: CRITICAL ERROR - One or more environment variables are not set. The application cannot start.");
-    throw new Error('Missing required environment variables. Check the console for details.');
+    throw new Error('Missing required environment variables');
 }
 
-// 1. Create a QueryClient instance. This is required for TanStack Query to work.
-const queryClient = new QueryClient();
-
-// 2. Create the wagmi adapter
-const wagmiAdapter = new WagmiAdapter({
-    projectId,
-    // FIX: The AppKit WagmiAdapter expects the property to be `networks`, not `chains`.
-    networks: [sepolia, baseSepolia],
+// 1. Создайте простой wagmi config без AppKit
+const wagmiConfig = createConfig({
+    chains: [mainnet],
     transports: {
-        [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
-        [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
-    }
+        [mainnet.id]: http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyApiKey}`),
+    },
 });
 
-// 3. Create the AppKit instance
-createAppKit({
-    adapters: [wagmiAdapter],
-    metadata: {
-        name: 'Cabac',
-        description: 'A decentralized exchange (DEX) interface for swapping tokens.',
-        url: 'https://cabac.netlify.app',
-        icons: ['https://cabac.netlify.app/favicon.ico'],
-    }
-} as any); // Workaround for type issues
+const queryClient = new QueryClient();
 
-// 4. Get the wagmiConfig from the adapter
-const wagmiConfig = wagmiAdapter.wagmiConfig;
-console.log(`providers.tsx: wagmiConfig created: ${wagmiConfig ? 'success' : 'FAILED'}`);
+// 2. ВРЕМЕННО закомментируйте AppKit инициализацию
+/*
+try {
+    console.log("Attempting to initialize AppKit...");
+    const wagmiAdapter = new WagmiAdapter({
+        projectId,
+        networks: [mainnet],
+        transports: {
+            [mainnet.id]: http(`https://eth-mainnet.g.alchemy.com/v2/${alchemyApiKey}`),
+        }
+    });
+    
+    createAppKit({
+        adapters: [wagmiAdapter],
+        metadata: {
+            name: 'Cabac',
+            description: 'A decentralized exchange (DEX) interface for swapping tokens.',
+            url: 'https://cabac.netlify.app',
+            icons: ['https://cabac.netlify.app/favicon.ico'],
+        }
+    } as any);
+    console.log("AppKit initialized successfully");
+} catch (error) {
+    console.error("AppKit initialization failed:", error);
+}
+*/
 
-
-// 5. AppProviders must include both WagmiProvider and QueryClientProvider.
-// Wagmi hooks depend on the context provided by both to function correctly.
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
     console.log("providers.tsx: Rendering AppProviders component.");
     return (
@@ -61,5 +63,3 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
         </WagmiProvider>
     );
 };
-
-console.log("providers.tsx: Module loaded successfully.");
