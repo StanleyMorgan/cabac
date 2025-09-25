@@ -117,20 +117,17 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             
             if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
                 setIsApproving(true);
-                 // FIX: Cast parameters to `any` to work around a deep type instantiation issue in viem.
-                 // FIX: Cast result to bigint to allow for comparison.
+                 // FIX: Cast to any to work around a deep type instantiation issue in viem.
                  const allowance = await publicClient.readContract({
                     address: tokenIn.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'allowance',
                     args: [address, routerAddress],
-                } as any) as bigint;
+                } as any);
 
                 if (allowance < amountInParsed) {
                     // FIX: Add chain parameter to writeContract call.
-                    // FIX: Add account to writeContract call.
                     const approveTx = await walletClient.writeContract({
-                        account: address,
                         address: tokenIn.address as `0x${string}`,
                         abi: ERC20_ABI,
                         functionName: 'approve',
@@ -143,7 +140,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             }
 
             setIsSwapping(true);
-            const amountOutMinimum = parseUnits(amountOut, tokenOut.decimals) * (10000n - BigInt(Math.floor(slippage * 100))) / 10000n;
+            const amountOutMinimum = parseUnits(amountOut, tokenOut.decimals) * BigInt(10000 - Math.floor(slippage * 100)) / BigInt(10000);
 
             // FIX: Ensure deadline and sqrtPriceLimitX96 are bigints.
             const swapParams = {
@@ -158,14 +155,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             };
 
             // FIX: Add chain parameter to writeContract call.
-            // FIX: Add account to writeContract call.
             const swapTx = await walletClient.writeContract({
-                account: address,
                 address: routerAddress,
                 abi: ROUTER_ABI,
                 functionName: 'exactInputSingle',
                 args: [swapParams],
-                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : 0n,
+                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : BigInt(0),
                 chain,
             });
              await publicClient.waitForTransactionReceipt({ hash: swapTx });

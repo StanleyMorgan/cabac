@@ -42,7 +42,7 @@ const MyPositions: React.FC = () => {
                 const positionManagerAddress = CONTRACT_ADDRESSES[chain.id].POSITION_MANAGER;
                 console.log("MyPositions: Using Position Manager address:", positionManagerAddress);
 
-                // FIX: Cast parameters to `any` to work around a deep type instantiation issue in viem.
+                // FIX: Cast to any to work around a deep type instantiation issue in viem.
                 const balance = await publicClient.readContract({
                     address: positionManagerAddress,
                     abi: POSITION_MANAGER_ABI,
@@ -145,10 +145,6 @@ const MyPositions: React.FC = () => {
                             </div>
                             <div className="text-right">
                                 <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
-                                <div className="flex items-center justify-end space-x-2 mt-1">
-                                    <button className="text-xs bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-2 rounded-md">Add</button>
-                                    <button className="text-xs bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-2 rounded-md">Remove</button>
-                                </div>
                             </div>
                         </div>
                     ))}
