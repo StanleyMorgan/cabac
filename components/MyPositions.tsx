@@ -42,9 +42,6 @@ const PositionItem = ({ positionData }: { positionData: PositionData }) => {
         return foundToken || createFallbackToken(positionData.token1);
     }, [allTokens, positionData.token1]);
 
-    // Uniswap V3's global min/max ticks for full range
-    const isFullRange = positionData.tickLower === -887272 && positionData.tickUpper === 887272;
-
     return (
         <div className="bg-brand-surface-2 p-3 rounded-lg flex justify-between items-center">
             <div className="flex items-center">
@@ -57,16 +54,17 @@ const PositionItem = ({ positionData }: { positionData: PositionData }) => {
                     <p className="text-xs text-brand-text-secondary">{positionData.fee / 10000}% Fee Tier</p>
                 </div>
             </div>
-            <div className="text-right">
-                {isFullRange ? (
-                     <span className="text-xs font-semibold bg-brand-secondary text-brand-text-primary px-2 py-1 rounded-md">
-                        Full Range
-                    </span>
-                ) : (
-                     <span className="text-xs font-semibold bg-brand-primary/50 text-blue-300 px-2 py-1 rounded-md">
-                        Concentrated
-                    </span>
-                )}
+            <div className="flex items-center justify-end space-x-2">
+                <button
+                    className="border border-brand-secondary hover:bg-brand-secondary text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm"
+                >
+                    Remove
+                </button>
+                <button
+                    className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm"
+                >
+                    Add
+                </button>
             </div>
         </div>
     );
@@ -100,12 +98,13 @@ const MyPositions: React.FC = () => {
         setIsLoading(true);
         try {
             // 1. Fetch balance
-            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const balance = await publicClient.readContract({
                 address: positionManagerAddress,
                 abi: POSITION_MANAGER_ABI,
                 functionName: 'balanceOf',
                 args: [address],
+                // @ts-ignore - viem/wagmi typing issue with Celo support
+                authorizationList: [],
             });
 
             const positionCount = Number(balance);
@@ -122,8 +121,7 @@ const MyPositions: React.FC = () => {
                 args: [address, BigInt(index)],
             }));
 
-            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
-            const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsContracts });
+            const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsContracts, authorizationList: [] });
             const tokenIds = tokenIdsResults
                 .filter(r => r.status === 'success' && r.result)
                 .map(r => r.result as bigint);
@@ -140,8 +138,8 @@ const MyPositions: React.FC = () => {
                 functionName: 'positions',
                 args: [tokenId],
             }));
-            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
-            const positionsResults = await publicClient.multicall({ contracts: positionsContracts });
+            // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall.
+            const positionsResults = await publicClient.multicall({ contracts: positionsContracts as any, authorizationList: [] });
 
             // 4. Parse and filter results
             const parsedPositions = positionsResults.map(result => {

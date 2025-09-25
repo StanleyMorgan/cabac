@@ -114,6 +114,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
             address: pool.address as `0x${string}`,
             abi: POOL_ABI,
             functionName: 'slot0',
+            // @ts-ignore - viem/wagmi typing issue with Celo support
+            authorizationList: [],
         }).then(setSlot0).catch(console.error).finally(() => setIsSlot0Loading(false));
 
         // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
@@ -121,6 +123,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
             address: pool.address as `0x${string}`,
             abi: POOL_ABI,
             functionName: 'tickSpacing',
+            // @ts-ignore - viem/wagmi typing issue with Celo support
+            authorizationList: [],
         }).then(res => setTickSpacing(Number(res))).catch(console.error);
     }, [publicClient, pool.address]);
 
@@ -134,6 +138,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
                     abi: ERC20_ABI,
                     functionName: 'allowance',
                     args: [address, contracts.POSITION_MANAGER],
+                    // @ts-ignore - viem/wagmi typing issue with Celo support
+                    authorizationList: [],
                 }),
                 // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
                 publicClient.readContract({
@@ -141,6 +147,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
                     abi: ERC20_ABI,
                     functionName: 'allowance',
                     args: [address, contracts.POSITION_MANAGER],
+                    // @ts-ignore - viem/wagmi typing issue with Celo support
+                    authorizationList: [],
                 })
             ]);
             setAllowance0(res0);

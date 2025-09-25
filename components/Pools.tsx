@@ -54,10 +54,11 @@ const Pools: React.FC = () => {
                     args: [pool.address as `0x${string}`],
                 },
             ]);
-
-            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
+            
+            // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall.
             const results = await publicClient.multicall({
-                contracts: contractsToRead,
+                contracts: contractsToRead as any,
+                authorizationList: [],
             });
 
             setBalanceResults(results.map(r => r.status === 'success' ? r.result as bigint : undefined));
@@ -146,8 +147,8 @@ const Pools: React.FC = () => {
                             <thead className="text-xs text-brand-text-secondary uppercase bg-brand-surface-2">
                                 <tr>
                                     <th scope="col" className="p-4 text-left font-semibold">Pair</th>
+                                    <th scope="col" className="p-4 text-right font-semibold">Fee Tier</th>
                                     <th scope="col" className="p-4 text-right font-semibold">TVL</th>
-                                    <th scope="col" className="p-4 text-right font-semibold">My Liquidity</th>
                                     <th scope="col" className="p-4 text-right font-semibold"></th>
                                 </tr>
                             </thead>

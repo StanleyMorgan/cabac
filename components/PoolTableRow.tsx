@@ -27,7 +27,7 @@ const SkeletonCell: React.FC = () => (
 );
 
 export const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemove, isLoading = false }) => {
-    const { token0, token1, tvl, myLiquidity } = pool;
+    const { token0, token1, tvl, fee } = pool;
 
     return (
         <tr className="border-b border-brand-secondary last:border-b-0 hover:bg-brand-surface-2 transition-colors">
@@ -50,22 +50,15 @@ export const PoolTableRow: React.FC<PoolTableRowProps> = ({ pool, onAdd, onRemov
             ) : (
                 <>
                     <td className="p-4 text-right font-mono text-brand-text-primary">
-                        {formatCurrency(tvl)}
+                        {fee / 10000}%
                     </td>
                     <td className="p-4 text-right font-mono text-brand-text-primary">
-                        {formatCurrency(myLiquidity)}
+                        {formatCurrency(tvl)}
                     </td>
                 </>
             )}
             <td className="p-4 text-right">
-                <div className="flex items-center justify-end space-x-2">
-                    <button 
-                        onClick={onRemove}
-                        disabled={isLoading}
-                        className="border border-brand-secondary hover:bg-brand-secondary text-white font-semibold py-1 px-4 rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Remove
-                    </button>
+                <div className="flex items-center justify-end">
                     <button 
                         onClick={onAdd}
                         disabled={isLoading}

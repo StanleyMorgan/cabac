@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
@@ -104,6 +105,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     abi: ERC20_ABI,
                     functionName: 'balanceOf',
                     args: [address],
+                    // @ts-ignore - viem/wagmi typing issue with Celo support
+                    authorizationList: [],
                   });
 
             setBalance({ value: balanceValue, formatted: formatUnits(balanceValue, token.decimals) });
@@ -128,6 +131,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 address: tokenIn.address as `0x${string}`,
                 functionName: 'allowance',
                 args: [address, contracts.ROUTER],
+                // @ts-ignore - viem/wagmi typing issue with Celo support
+                authorizationList: [],
             });
             setAllowance(result);
         } catch (e) {
