@@ -6,13 +6,13 @@ import type { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS } from '../constants';
 import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI } from '../config';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAppKit } from '@reown/appkit/react';
 
 import TokenInput from './TokenInput';
 import TokenSelectorModal from './TokenSelectorModal';
 import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
-import ConnectWalletButton from './ConnectWalletButton';
 
 
 interface SwapCardProps {
@@ -23,6 +23,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { address, chain } = useAccount();
     const publicClient = usePublicClient();
     const { data: walletClient } = useWalletClient();
+    const { open: openWalletModal } = useAppKit();
 
     const chainId = chain?.id ?? baseSepolia.id;
     const tokens = useMemo(() => TOKENS_BY_CHAIN[chainId] || [], [chainId]);
@@ -185,7 +186,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     };
 
 
-    const isButtonDisabled = !isWalletConnected || !amountIn || isApproving || isSwapping || parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0');
+    const isButtonDisabled = isWalletConnected && (
+        !amountIn || 
+        isApproving || 
+        isSwapping || 
+        parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')
+    );
+
     const buttonText = () => {
         if (!isWalletConnected) return 'Connect Wallet';
         if (isApproving) return 'Approving...';
@@ -193,7 +200,11 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!amountIn) return 'Enter an amount';
          if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
         return 'Swap';
-    }
+    };
+
+    // FIX: The `openWalletModal` function is not directly compatible with the `onClick` event handler type.
+    // It is wrapped in an arrow function to ensure it's called correctly without arguments when the button is clicked.
+    const handleButtonClick = isWalletConnected ? handleSwap : () => openWalletModal();
 
     return (
         <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
@@ -231,17 +242,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     isOutput={true}
                 />
             </div>
-             {isWalletConnected ? (
-                <button
-                    onClick={handleSwap}
-                    disabled={isButtonDisabled}
-                    className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-4 px-4 rounded-xl mt-4 transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {buttonText()}
-                </button>
-            ) : (
-                <ConnectWalletButton />
-            )}
+            <button
+                onClick={handleButtonClick}
+                disabled={isButtonDisabled}
+                className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-4 px-4 rounded-xl mt-4 transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {buttonText()}
+            </button>
              {error && <p className="text-brand-accent text-sm mt-3 text-center">{error}</p>}
 
             <TokenSelectorModal
