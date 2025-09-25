@@ -58,6 +58,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     });
 
     useEffect(() => {
+        console.log("SwapCard.tsx: Component successfully mounted.");
+    }, []);
+
+    useEffect(() => {
         if (tokens.length > 1 && (!tokenIn.address || !tokenOut.address)) {
             setTokenIn(tokens[0]);
             setTokenOut(tokens[1]);

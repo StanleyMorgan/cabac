@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
@@ -7,6 +7,10 @@ import Pools from './components/Pools';
 const App: React.FC = () => {
   const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState<'swap' | 'pools'>('swap');
+
+  useEffect(() => {
+    console.log("App.tsx: Component successfully mounted.");
+  }, []);
 
   const getTabClass = (tabName: 'swap' | 'pools') => {
     return activeTab === tabName
