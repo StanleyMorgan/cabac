@@ -20,6 +20,14 @@ const minimalBalanceOfAbi = [
     }
 ] as const;
 
+// Fix: Define an explicit type for multicall contracts to avoid deep type instantiation errors.
+type BalanceOfContractCall = {
+    address: `0x${string}`;
+    abi: typeof minimalBalanceOfAbi;
+    functionName: 'balanceOf';
+    args: readonly [`0x${string}`];
+};
+
 const Pools: React.FC = () => {
     const { isConnected, chain } = useAccount();
     const chainId = chain?.id;
@@ -40,7 +48,7 @@ const Pools: React.FC = () => {
         if (!publicClient || !isConnected || basePools.length === 0) return;
         setAreBalancesFetching(true);
         try {
-            const contractsToRead = basePools.flatMap((pool) => [
+            const contractsToRead: BalanceOfContractCall[] = basePools.flatMap((pool) => [
                 {
                     address: pool.token0.address as `0x${string}`,
                     abi: minimalBalanceOfAbi,
@@ -55,7 +63,7 @@ const Pools: React.FC = () => {
                 },
             ]);
             
-            // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall.
+            // FIX: Cast contracts to `any` to avoid a deep type instantiation issue with viem's multicall, similar to MyPositions.tsx.
             const results = await publicClient.multicall({
                 contracts: contractsToRead as any,
                 authorizationList: [],
