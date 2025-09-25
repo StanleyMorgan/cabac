@@ -90,7 +90,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
                 args: [address, positionManagerAddress],
             } as any);
             
-            if (allowance0 < amount0Parsed) {
+            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+            if ((allowance0 as bigint) < amount0Parsed) {
                 const approveTx0 = await walletClient.writeContract({
                     address: pool.token0.address as `0x${string}`,
                     abi: ERC20_ABI,
@@ -111,7 +112,8 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
                 args: [address, positionManagerAddress],
             } as any);
     
-            if (allowance1 < amount1Parsed) {
+            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+            if ((allowance1 as bigint) < amount1Parsed) {
                 const approveTx1 = await walletClient.writeContract({
                     address: pool.token1.address as `0x${string}`,
                     abi: ERC20_ABI,
@@ -129,8 +131,9 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
             // For a "full range" position, we use the min and max possible ticks, adjusted for the pool's tick spacing.
             const MIN_TICK = -887272;
             const MAX_TICK = 887272;
-            const tickLower = BigInt(Math.ceil(MIN_TICK / tickSpacing) * tickSpacing);
-            const tickUpper = BigInt(Math.floor(MAX_TICK / tickSpacing) * tickSpacing);
+            // FIX: tickLower and tickUpper should be numbers for `int24` types, not bigints.
+            const tickLower = Math.ceil(MIN_TICK / tickSpacing) * tickSpacing;
+            const tickUpper = Math.floor(MAX_TICK / tickSpacing) * tickSpacing;
     
             const mintParams = {
                 token0: pool.token0.address as `0x${string}`,
