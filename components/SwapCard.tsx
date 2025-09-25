@@ -125,14 +125,17 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     args: [address, routerAddress],
                 } as any);
 
-                if (allowance < amountInParsed) {
+                // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+                if ((allowance as bigint) < amountInParsed) {
                     // FIX: Add chain parameter to writeContract call.
+                    // FIX: Add account to writeContract call.
                     const approveTx = await walletClient.writeContract({
                         address: tokenIn.address as `0x${string}`,
                         abi: ERC20_ABI,
                         functionName: 'approve',
                         args: [routerAddress, amountInParsed],
                         chain,
+                        account: address,
                     });
                     await publicClient.waitForTransactionReceipt({ hash: approveTx });
                 }
@@ -155,6 +158,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             };
 
             // FIX: Add chain parameter to writeContract call.
+            // FIX: Add account to writeContract call.
             const swapTx = await walletClient.writeContract({
                 address: routerAddress,
                 abi: ROUTER_ABI,
@@ -162,6 +166,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 args: [swapParams],
                 value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : BigInt(0),
                 chain,
+                account: address,
             });
              await publicClient.waitForTransactionReceipt({ hash: swapTx });
             
