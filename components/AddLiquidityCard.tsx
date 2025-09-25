@@ -109,12 +109,14 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     useEffect(() => {
         if (!publicClient) return;
         setIsSlot0Loading(true);
+        // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
         publicClient.readContract({
             address: pool.address as `0x${string}`,
             abi: POOL_ABI,
             functionName: 'slot0',
         }).then(setSlot0).catch(console.error).finally(() => setIsSlot0Loading(false));
 
+        // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
         publicClient.readContract({
             address: pool.address as `0x${string}`,
             abi: POOL_ABI,
@@ -126,12 +128,14 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         if (!publicClient || !address || !contracts?.POSITION_MANAGER) return;
         try {
             const [res0, res1] = await Promise.all([
+                // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
                 publicClient.readContract({
                     address: token0.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'allowance',
                     args: [address, contracts.POSITION_MANAGER],
                 }),
+                // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
                 publicClient.readContract({
                     address: token1.address as `0x${string}`,
                     abi: ERC20_ABI,

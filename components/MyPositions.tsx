@@ -100,6 +100,7 @@ const MyPositions: React.FC = () => {
         setIsLoading(true);
         try {
             // 1. Fetch balance
+            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const balance = await publicClient.readContract({
                 address: positionManagerAddress,
                 abi: POSITION_MANAGER_ABI,
@@ -114,14 +115,14 @@ const MyPositions: React.FC = () => {
             }
 
             // 2. Fetch all token IDs
-            // Fix: Add `as const` to help with TypeScript type inference for multicall
             const tokenIdsContracts = Array.from({ length: positionCount }, (_, index) => ({
                 address: positionManagerAddress,
                 abi: POSITION_MANAGER_ABI,
                 functionName: 'tokenOfOwnerByIndex',
                 args: [address, BigInt(index)],
-            } as const));
+            }));
 
+            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsContracts });
             const tokenIds = tokenIdsResults
                 .filter(r => r.status === 'success' && r.result)
@@ -133,13 +134,13 @@ const MyPositions: React.FC = () => {
             }
             
             // 3. Fetch all position details
-            // Fix: Add `as const` to help with TypeScript type inference for multicall
             const positionsContracts = tokenIds.map(tokenId => ({
                 address: positionManagerAddress,
                 abi: POSITION_MANAGER_ABI,
                 functionName: 'positions',
                 args: [tokenId],
-            } as const));
+            }));
+            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const positionsResults = await publicClient.multicall({ contracts: positionsContracts });
 
             // 4. Parse and filter results

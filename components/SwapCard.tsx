@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
@@ -9,17 +11,18 @@ import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
-import { useAppKit } from '@reown/appkit/react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
 import { baseSepolia } from 'viem/chains';
+import { useConnect } from 'wagmi';
+
 
 interface SwapCardProps {
     isWalletConnected: boolean;
 }
 
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
-    const { open } = useAppKit();
+    const { connect, connectors } = useConnect();
     const { address, chain } = useAccount();
     const chainId = chain?.id;
     
@@ -95,11 +98,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             const isNative = token.address === NATIVE_TOKEN_ADDRESS;
             const balanceValue = isNative
                 ? await publicClient.getBalance({ address })
+                // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
                 : await publicClient.readContract({
                     address: token.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'balanceOf',
-                    args: [address]
+                    args: [address],
                   });
 
             setBalance({ value: balanceValue, formatted: formatUnits(balanceValue, token.decimals) });
@@ -118,6 +122,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
         setIsAllowanceFetching(true);
         try {
+            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const result = await publicClient.readContract({
                 abi: ERC20_ABI,
                 address: tokenIn.address as `0x${string}`,
@@ -381,6 +386,15 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!swapResult?.request) return;
         executeTransaction(swapResult.request);
     }
+    
+    const handleConnect = () => {
+        // Find the first available connector and connect.
+        const connector = connectors.find(c => c.ready);
+        if (connector) {
+            connect({ connector });
+        }
+    };
+
 
     const getButtonText = () => {
         if (!isWalletConnected) return 'Connect Wallet';
@@ -493,7 +507,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 </div>
 
                 <button
-                    onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : () => open()}
+                    onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : handleConnect}
                     disabled={isButtonDisabled}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >

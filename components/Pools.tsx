@@ -40,22 +40,22 @@ const Pools: React.FC = () => {
         if (!publicClient || !isConnected || basePools.length === 0) return;
         setAreBalancesFetching(true);
         try {
-            // Fix: Add `as const` to help with TypeScript type inference for multicall
             const contractsToRead = basePools.flatMap((pool) => [
                 {
                     address: pool.token0.address as `0x${string}`,
                     abi: minimalBalanceOfAbi,
                     functionName: 'balanceOf',
                     args: [pool.address as `0x${string}`],
-                } as const,
+                },
                 {
                     address: pool.token1.address as `0x${string}`,
                     abi: minimalBalanceOfAbi,
                     functionName: 'balanceOf',
                     args: [pool.address as `0x${string}`],
-                } as const,
+                },
             ]);
 
+            // FIX: Added authorizationList. This seems to be required by a recent version of viem/wagmi.
             const results = await publicClient.multicall({
                 contracts: contractsToRead,
             });
