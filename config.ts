@@ -1,213 +1,205 @@
 import { sepolia, baseSepolia } from 'viem/chains';
 
-// --- ABIs ---
-
-// FIX: Added `as const` to the ERC20_ABI. This ensures that TypeScript infers the
-// narrowest possible types for the ABI (e.g., "function" instead of string), which is
-// required for wagmi hooks like `useReadContracts` to work correctly. The "excessively
-// deep" error this might cause in dynamic contract arrays is resolved in `Pools.tsx`.
 export const ERC20_ABI = [
   {
-    "inputs": [
-      {
-        "name": "_owner",
-        "type": "address"
-      },
-      {
-        "name": "_spender",
-        "type": "address"
-      }
-    ],
-    "name": "allowance",
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
+    "constant": true,
+    "inputs": [],
+    "name": "name",
+    "outputs": [{ "name": "", "type": "string" }],
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "name": "_spender",
-        "type": "address"
-      },
-      {
-        "name": "_value",
-        "type": "uint256"
-      }
-    ],
+    "constant": false,
+    "inputs": [{ "name": "spender", "type": "address" }, { "name": "value", "type": "uint256" }],
     "name": "approve",
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "nonpayable",
+    "outputs": [{ "name": "", "type": "bool" }],
     "type": "function"
   },
   {
-    "inputs": [
-        {
-            "name": "_owner",
-            "type": "address"
-        }
-    ],
+    "constant": true,
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [{ "name": "from", "type": "address" }, { "name": "to", "type": "address" }, { "name": "value", "type": "uint256" }],
+    "name": "transferFrom",
+    "outputs": [{ "name": "", "type": "bool" }],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [{ "name": "", "type": "uint8" }],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [{ "name": "owner", "type": "address" }],
     "name": "balanceOf",
-    "outputs": [
-        {
-            "name": "balance",
-            "type": "uint256"
-        }
-    ],
-    "stateMutability": "view",
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{ "name": "", "type": "string" }],
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [{ "name": "to", "type": "address" }, { "name": "value", "type": "uint256" }],
+    "name": "transfer",
+    "outputs": [{ "name": "", "type": "bool" }],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [{ "name": "owner", "type": "address" }, { "name": "spender", "type": "address" }],
+    "name": "allowance",
+    "outputs": [{ "name": "", "type": "uint256" }],
     "type": "function"
   }
 ] as const;
 
 export const ROUTER_ABI = [
-  {
-    "inputs": [
-      {
-        "components": [
-          { "type": "address", "name": "tokenIn" },
-          { "type": "address", "name": "tokenOut" },
-          { "type": "uint24", "name": "fee" },
-          { "type": "address", "name": "recipient" },
-          { "type": "uint256", "name": "deadline" },
-          { "type": "uint256", "name": "amountIn" },
-          { "type": "uint256", "name": "amountOutMinimum" },
-          { "type": "uint160", "name": "sqrtPriceLimitX96" }
-        ],
-        "name": "params",
-        "type": "tuple"
-      }
-    ],
-    "name": "exactInputSingle",
-    "outputs": [{ "type": "uint256", "name": "amountOut" }],
-    "stateMutability": "payable",
-    "type": "function"
-  }
-] as const;
-
-export const POOL_ABI = [
-    {
-        "inputs": [],
-        "name": "slot0",
-        "outputs": [
-            { "type": "uint160", "name": "sqrtPriceX96" },
-            { "type": "int24", "name": "tick" },
-            { "type": "uint16", "name": "observationIndex" },
-            { "type": "uint16", "name": "observationCardinality" },
-            { "type": "uint16", "name": "observationCardinalityNext" },
-            { "type": "uint8", "name": "feeProtocol" },
-            { "type": "bool", "name": "unlocked" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "tickSpacing",
-        "outputs": [
-            { "type": "int24", "name": "" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-    }
-] as const;
-
-export const POSITION_MANAGER_ABI = [
     {
         "inputs": [
             {
                 "components": [
-                    { "type": "address", "name": "token0" },
-                    { "type": "address", "name": "token1" },
+                    { "type": "address", "name": "tokenIn" },
+                    { "type": "address", "name": "tokenOut" },
                     { "type": "uint24", "name": "fee" },
-                    { "type": "int24", "name": "tickLower" },
-                    { "type": "int24", "name": "tickUpper" },
-                    { "type": "uint256", "name": "amount0Desired" },
-                    { "type": "uint256", "name": "amount1Desired" },
-                    { "type": "uint256", "name": "amount0Min" },
-                    { "type": "uint256", "name": "amount1Min" },
                     { "type": "address", "name": "recipient" },
-                    { "type": "uint256", "name": "deadline" }
+                    { "type": "uint256", "name": "deadline" },
+                    { "type": "uint256", "name": "amountIn" },
+                    { "type": "uint256", "name": "amountOutMinimum" },
+                    { "type": "uint160", "name": "sqrtPriceLimitX96" }
                 ],
                 "name": "params",
                 "type": "tuple"
             }
         ],
-        "name": "mint",
+        "name": "exactInputSingle",
         "outputs": [
-            { "type": "uint256", "name": "tokenId" },
-            { "type": "uint128", "name": "liquidity" },
-            { "type": "uint256", "name": "amount0" },
-            { "type": "uint256", "name": "amount1" }
+            { "type": "uint256", "name": "amountOut" }
         ],
         "stateMutability": "payable",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "type": "address", "name": "owner" }],
-        "name": "balanceOf",
-        "outputs": [{ "type": "uint256", "name": "" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            { "type": "address", "name": "owner" },
-            { "type": "uint256", "name": "index" }
-        ],
-        "name": "tokenOfOwnerByIndex",
-        "outputs": [{ "type": "uint256", "name": "" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "type": "uint256", "name": "tokenId" }],
-        "name": "positions",
-        "outputs": [
-            { "type": "uint96", "name": "nonce" },
-            { "type": "address", "name": "operator" },
-            { "type": "address", "name": "token0" },
-            { "type": "address", "name": "token1" },
-            { "type": "uint24", "name": "fee" },
-            { "type": "int24", "name": "tickLower" },
-            { "type": "int24", "name": "tickUpper" },
-            { "type": "uint128", "name": "liquidity" },
-            { "type": "uint256", "name": "feeGrowthInside0LastX128" },
-            { "type": "uint256", "name": "feeGrowthInside1LastX128" },
-            { "type": "uint128", "name": "tokensOwed0" },
-            { "type": "uint128", "name": "tokensOwed1" }
-        ],
-        "stateMutability": "view",
         "type": "function"
     }
 ] as const;
 
+export const POOL_ABI = [
+  {
+    "inputs": [],
+    "name": "slot0",
+    "outputs": [
+      { "internalType": "uint160", "name": "sqrtPriceX96", "type": "uint160" },
+      { "internalType": "int24", "name": "tick", "type": "int24" },
+      { "internalType": "uint16", "name": "observationIndex", "type": "uint16" },
+      { "internalType": "uint16", "name": "observationCardinality", "type": "uint16" },
+      { "internalType": "uint16", "name": "observationCardinalityNext", "type": "uint16" },
+      { "internalType": "uint8", "name": "feeProtocol", "type": "uint8" },
+      { "internalType": "bool", "name": "unlocked", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "tickSpacing",
+    "outputs": [
+      { "internalType": "int24", "name": "", "type": "int24" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
-// --- Contract Addresses ---
+export const POSITION_MANAGER_ABI = [
+  {
+    "inputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "token0", "type": "address" },
+          { "internalType": "address", "name": "token1", "type": "address" },
+          { "internalType": "uint24", "name": "fee", "type": "uint24" },
+          { "internalType": "int24", "name": "tickLower", "type": "int24" },
+          { "internalType": "int24", "name": "tickUpper", "type": "int24" },
+          { "internalType": "uint256", "name": "amount0Desired", "type": "uint256" },
+          { "internalType": "uint256", "name": "amount1Desired", "type": "uint256" },
+          { "internalType": "uint256", "name": "amount0Min", "type": "uint256" },
+          { "internalType": "uint256", "name": "amount1Min", "type": "uint256" },
+          { "internalType": "address", "name": "recipient", "type": "address" },
+          { "internalType": "uint256", "name": "deadline", "type": "uint256" }
+        ],
+        "internalType": "struct INonfungiblePositionManager.MintParams",
+        "name": "params",
+        "type": "tuple"
+      }
+    ],
+    "name": "mint",
+    "outputs": [
+      { "internalType": "uint256", "name": "tokenId", "type": "uint256" },
+      { "internalType": "uint128", "name": "liquidity", "type": "uint128" },
+      { "internalType": "uint256", "name": "amount0", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount1", "type": "uint256" }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "address", "name": "owner", "type": "address" } ],
+    "name": "balanceOf",
+    "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [ { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ],
+    "name": "positions",
+    "outputs": [
+      { "internalType": "uint96", "name": "nonce", "type": "uint96" },
+      { "internalType": "address", "name": "operator", "type": "address" },
+      { "internalType": "address", "name": "token0", "type": "address" },
+      { "internalType": "address", "name": "token1", "type": "address" },
+      { "internalType": "uint24", "name": "fee", "type": "uint24" },
+      { "internalType": "int24", "name": "tickLower", "type": "int24" },
+      { "internalType": "int24", "name": "tickUpper", "type": "int24" },
+      { "internalType": "uint128", "name": "liquidity", "type": "uint128" },
+      { "internalType": "uint256", "name": "feeGrowthInside0LastX128", "type": "uint256" },
+      { "internalType": "uint256", "name": "feeGrowthInside1LastX128", "type": "uint256" },
+      { "internalType": "uint128", "name": "tokensOwed0", "type": "uint128" },
+      { "internalType": "uint128", "name": "tokensOwed1", "type": "uint128" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "owner", "type": "address" },
+      { "internalType": "uint256", "name": "index", "type": "uint256" }
+    ],
+    "name": "tokenOfOwnerByIndex",
+    "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
-export const CONTRACT_ADDRESSES: {
-    [chainId: number]: {
-        ROUTER: `0x${string}`;
-        POSITION_MANAGER: `0x${string}`;
-        WETH: `0x${string}`;
-    }
-} = {
+export const CONTRACT_ADDRESSES: { [chainId: number]: { ROUTER: `0x${string}`, POSITION_MANAGER: `0x${string}`, WETH: `0x${string}` } } = {
     [sepolia.id]: {
-        ROUTER: '0x3bFA4769FB09eefC5aB096D40Ea009372DE6A227',
-        POSITION_MANAGER: '0x1238536071E1c577A68CF586AbD578b2B4182373',
+        ROUTER: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
+        POSITION_MANAGER: '0x1238536071E1c577A6022AC04928Ca55F5D2c515',
         WETH: '0x7b79995e5f793A07Bc00c21412e50Eaae098E7f9',
     },
     [baseSepolia.id]: {
-        ROUTER: '0x236216C666dbcc76D057539475660dC48f9e0808',
-        POSITION_MANAGER: '0x195339564373c25265f954d89Bfa9Ae20136D0Fe',
+        ROUTER: '0x02a2B3319F47D18706325424419a3014DecD5857',
+        POSITION_MANAGER: '0x32753bB119616738317a61E370d238A73C17483a',
         WETH: '0x4200000000000000000000000000000000000006',
     }
 };

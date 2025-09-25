@@ -9,8 +9,8 @@ import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 import { RefreshIcon } from './icons/RefreshIcon';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { useAccount, useBalance, useReadContract, useWriteContract, useSimulateContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
@@ -19,10 +19,14 @@ interface SwapCardProps {
 }
 
 const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
-    const { address, chainId } = useAccount();
-    const { openConnectModal } = useConnectModal();
+    const { open } = useAppKit();
+    const { address, chain } = useAccount();
+    const chainId = chain?.id;
     
     const displayChainId = chainId || baseSepolia.id;
+    
+    const publicClient = usePublicClient({ chainId: displayChainId });
+    const { data: walletClient } = useWalletClient({ chainId: displayChainId });
 
     const isSupportedChain = useMemo(() => {
         if (!chainId) return false;
@@ -51,6 +55,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [amountOutMinimum, setAmountOutMinimum] = useState(0n);
     const [isApprovalNeeded, setIsApprovalNeeded] = useState(false);
 
+    // State for transactions
+    const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+    const [isTxPending, setIsTxPending] = useState(false);
+    const [isTxConfirming, setIsTxConfirming] = useState(false);
+    const [isTxSuccess, setIsTxSuccess] = useState(false);
+
     const debouncedAmountIn = useDebounce(amountIn, 500);
     const amountInBigInt = useMemo(() => {
         try {
@@ -59,6 +69,74 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             return 0n;
         }
     }, [debouncedAmountIn, tokenIn]);
+
+    // --- Data Fetching States ---
+    const [balanceIn, setBalanceIn] = useState<{ value: bigint; formatted: string; } | undefined>();
+    const [isBalanceInFetching, setIsBalanceInFetching] = useState(false);
+    const [balanceOut, setBalanceOut] = useState<{ value: bigint; formatted: string; } | undefined>();
+    const [isBalanceOutFetching, setIsBalanceOutFetching] = useState(false);
+    const [allowance, setAllowance] = useState<bigint | undefined>();
+    const [isAllowanceFetching, setIsAllowanceFetching] = useState(false);
+    const [quoteResult, setQuoteResult] = useState<{ result: bigint } | null>(null);
+    const [isQuoteFetching, setIsQuoteFetching] = useState(false);
+    const [quoteError, setQuoteError] = useState<Error | null>(null);
+    const [approveResult, setApproveResult] = useState<{ request: any } | null>(null);
+    const [swapResult, setSwapResult] = useState<{ request: any } | null>(null);
+    const [swapError, setSwapError] = useState<Error | null>(null);
+    
+    // --- Data Fetching Functions ---
+    const fetchBalance = useCallback(async (token: Token | null, setBalance: Function, setLoading: Function) => {
+        if (!publicClient || !address || !token) {
+            setBalance(undefined);
+            return;
+        }
+        setLoading(true);
+        try {
+            const isNative = token.address === NATIVE_TOKEN_ADDRESS;
+            const balanceValue = isNative
+                ? await publicClient.getBalance({ address })
+                : await publicClient.readContract({
+                    address: token.address as `0x${string}`,
+                    abi: ERC20_ABI,
+                    functionName: 'balanceOf',
+                    args: [address]
+                  });
+
+            setBalance({ value: balanceValue, formatted: formatUnits(balanceValue, token.decimals) });
+        } catch (e) {
+            console.error("Failed to fetch balance:", e);
+            setBalance(undefined);
+        } finally {
+            setLoading(false);
+        }
+    }, [publicClient, address]);
+
+    const fetchAllowance = useCallback(async () => {
+        if (!publicClient || !address || !tokenIn || tokenIn.address === NATIVE_TOKEN_ADDRESS || !contracts?.ROUTER) {
+            setAllowance(undefined);
+            return;
+        }
+        setIsAllowanceFetching(true);
+        try {
+            const result = await publicClient.readContract({
+                abi: ERC20_ABI,
+                address: tokenIn.address as `0x${string}`,
+                functionName: 'allowance',
+                args: [address, contracts.ROUTER],
+            });
+            setAllowance(result);
+        } catch (e) {
+            console.error("Failed to fetch allowance:", e);
+        } finally {
+            setIsAllowanceFetching(false);
+        }
+    }, [publicClient, address, tokenIn, contracts]);
+
+
+    useEffect(() => { fetchBalance(tokenIn, setBalanceIn, setIsBalanceInFetching); }, [fetchBalance, tokenIn]);
+    useEffect(() => { fetchBalance(tokenOut, setBalanceOut, setIsBalanceOutFetching); }, [fetchBalance, tokenOut]);
+    useEffect(() => { fetchAllowance(); }, [fetchAllowance]);
+
 
     const selectedPool = useMemo(() => {
         if (!tokenIn || !tokenOut) return undefined;
@@ -73,98 +151,112 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         );
     }, [tokenIn, tokenOut, allPoolsForChain, contracts]);
 
-    const { data: balanceIn, refetch: refetchBalanceIn, isFetching: isBalanceInFetching } = useBalance({ address, token: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn?.address as `0x${string}`, chainId });
-    const { data: balanceOut, refetch: refetchBalanceOut, isFetching: isBalanceOutFetching } = useBalance({ address, token: tokenOut?.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut?.address as `0x${string}`, chainId });
 
-    const { writeContract, data: txHash, isPending: isTxPending, reset } = useWriteContract();
-    const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+    // --- Transaction Simulations ---
+    const simulateQuote = useCallback(async () => {
+        if (!publicClient || !tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || !selectedPool || isApprovalNeeded) {
+            setQuoteResult(null);
+            return;
+        }
+        setIsQuoteFetching(true);
+        setQuoteError(null);
+        try {
+            const quoteArgs = {
+                tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
+                tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
+                fee: selectedPool.fee,
+                recipient: address,
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+                amountIn: amountInBigInt,
+                amountOutMinimum: 0n,
+                sqrtPriceLimitX96: 0n,
+            };
 
-    const { data: allowanceResult, refetch: refetchAllowance, isFetching: isAllowanceFetching } = useReadContract({
-        abi: ERC20_ABI,
-        address: tokenIn?.address as `0x${string}`,
-        functionName: 'allowance',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: (address && contracts?.ROUTER) ? [address, contracts.ROUTER] as const : undefined,
-        chainId: chainId,
-        query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER,
-        },
-    });
-    const allowance = allowanceResult as bigint | undefined;
+            const { result } = await publicClient.simulateContract({
+                address: contracts.ROUTER,
+                abi: ROUTER_ABI,
+                functionName: 'exactInputSingle',
+                args: [quoteArgs],
+                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
+                account: address,
+            });
+            setQuoteResult({ result });
+        } catch (e) {
+            console.error("Quote simulation failed:", e);
+            setQuoteError(e as Error);
+            setQuoteResult(null);
+        } finally {
+            setIsQuoteFetching(false);
+        }
+    }, [publicClient, tokenIn, tokenOut, address, contracts, amountInBigInt, selectedPool, isApprovalNeeded]);
 
-    const { data: approveResult } = useSimulateContract({
-        address: tokenIn?.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: contracts?.ROUTER ? [contracts.ROUTER, maxUint256] as const : undefined,
-        query: {
-            enabled: !!address && !!tokenIn && tokenIn.address !== NATIVE_TOKEN_ADDRESS && !!contracts?.ROUTER && isApprovalNeeded,
-        },
-    });
-
-    const quoteArgs = useMemo(() => {
-        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || !selectedPool) return undefined;
-        return {
-            tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
-            tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
-            fee: selectedPool.fee,
-            recipient: address,
-            deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
-            amountIn: amountInBigInt,
-            amountOutMinimum: 0n,
-            sqrtPriceLimitX96: 0n,
-        };
-    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, selectedPool]);
-
-    const { data: quoteResult, isLoading: isQuoteLoading, isFetching: isQuoteFetching, error: quoteError, refetch: refetchQuote } = useSimulateContract({
-        address: contracts?.ROUTER,
-        abi: ROUTER_ABI,
-        functionName: 'exactInputSingle',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: quoteArgs ? [quoteArgs] as const : undefined,
-        value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        query: {
-            enabled: !!quoteArgs && !isApprovalNeeded,
-        },
-    });
+    const simulateApprove = useCallback(async () => {
+        if (!publicClient || !address || !tokenIn || tokenIn.address === NATIVE_TOKEN_ADDRESS || !contracts?.ROUTER || !isApprovalNeeded) {
+             setApproveResult(null);
+             return;
+        }
+        try {
+            const { request } = await publicClient.simulateContract({
+                address: tokenIn.address as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'approve',
+                args: [contracts.ROUTER, maxUint256],
+                account: address,
+            });
+            setApproveResult({ request });
+        } catch (e) {
+            console.error("Approve simulation failed:", e);
+            setApproveResult(null);
+        }
+    }, [publicClient, address, tokenIn, contracts, isApprovalNeeded]);
     
-    const swapArgs = useMemo(() => {
-        if (!tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n || !selectedPool) return undefined;
-        return {
-            tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
-            tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
-            fee: selectedPool.fee,
-            recipient: address,
-            deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
-            amountIn: amountInBigInt,
-            amountOutMinimum: amountOutMinimum,
-            sqrtPriceLimitX96: 0n,
-        };
-    }, [tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum, selectedPool]);
+    const simulateSwap = useCallback(async () => {
+         if (!publicClient || !tokenIn || !tokenOut || !address || !contracts?.ROUTER || !contracts?.WETH || amountInBigInt <= 0 || amountOutMinimum <= 0n || !selectedPool || isApprovalNeeded) {
+            setSwapResult(null);
+            return;
+         }
+         setSwapError(null);
+         try {
+             const swapArgs = {
+                tokenIn: (tokenIn.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenIn.address) as `0x${string}`,
+                tokenOut: (tokenOut.address === NATIVE_TOKEN_ADDRESS ? contracts.WETH : tokenOut.address) as `0x${string}`,
+                fee: selectedPool.fee,
+                recipient: address,
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+                amountIn: amountInBigInt,
+                amountOutMinimum: amountOutMinimum,
+                sqrtPriceLimitX96: 0n,
+             };
+            const { request } = await publicClient.simulateContract({
+                address: contracts.ROUTER,
+                abi: ROUTER_ABI,
+                functionName: 'exactInputSingle',
+                args: [swapArgs],
+                value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
+                account: address,
+            });
+            setSwapResult({ request });
+         } catch(e) {
+            console.error("Swap simulation failed:", e);
+            setSwapError(e as Error);
+            setSwapResult(null);
+         }
+    }, [publicClient, tokenIn, tokenOut, address, contracts, amountInBigInt, amountOutMinimum, selectedPool, isApprovalNeeded]);
 
-    const { data: swapResult, error: swapError } = useSimulateContract({
-        address: contracts?.ROUTER,
-        abi: ROUTER_ABI,
-        functionName: 'exactInputSingle',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: swapArgs ? [swapArgs] as const : undefined,
-        value: tokenIn?.address === NATIVE_TOKEN_ADDRESS ? amountInBigInt : undefined,
-        query: {
-            enabled: !!swapArgs && !isApprovalNeeded,
-        },
-    });
+
+    useEffect(() => { simulateQuote(); }, [simulateQuote]);
+    useEffect(() => { simulateApprove(); }, [simulateApprove]);
+    useEffect(() => { simulateSwap(); }, [simulateSwap]);
 
     const isRefreshing = isQuoteFetching || isBalanceInFetching || isBalanceOutFetching || isAllowanceFetching;
 
     const handleRefresh = useCallback(() => {
         if (isRefreshing) return;
-        void refetchQuote();
-        void refetchBalanceIn();
-        void refetchBalanceOut();
-        void refetchAllowance();
-    }, [isRefreshing, refetchQuote, refetchBalanceIn, refetchBalanceOut, refetchAllowance]);
-
+        simulateQuote();
+        fetchBalance(tokenIn, setBalanceIn, setIsBalanceInFetching);
+        fetchBalance(tokenOut, setBalanceOut, setIsBalanceOutFetching);
+        fetchAllowance();
+    }, [isRefreshing, simulateQuote, fetchBalance, tokenIn, tokenOut, fetchAllowance]);
 
     const exchangeRate = useMemo(() => {
         const numAmountIn = parseFloat(amountIn);
@@ -201,7 +293,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [quoteResult, tokenOut, slippage, quoteError]);
 
-
     useEffect(() => {
         if (amountInBigInt <= 0n) {
             setAmountOut('');
@@ -220,13 +311,23 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountIn('');
         setAmountOut('');
     }, [availableTokens, tokenIn, tokenOut]);
+    
+    // Reset tx states
+    const resetTx = useCallback(() => {
+        setTxHash(undefined);
+        setIsTxPending(false);
+        setIsTxConfirming(false);
+        setIsTxSuccess(false);
+    }, []);
 
-     useEffect(() => {
+    // Transaction success effect
+    useEffect(() => {
         if (isTxSuccess) {
-            void refetchAllowance();
-            reset();
+            fetchAllowance();
+            resetTx();
         }
-    }, [isTxSuccess, reset, refetchAllowance]);
+    }, [isTxSuccess, resetTx, fetchAllowance]);
+
 
     const handleTokenSelect = useCallback((token: Token) => {
         if (isSelectingFor === 'in') {
@@ -246,22 +347,39 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setAmountOut(amountIn);
     }, [tokenIn, tokenOut, amountIn, amountOut]);
     
+     const executeTransaction = useCallback(async (request: any) => {
+        if (!walletClient || !request || !publicClient) return;
+        
+        resetTx();
+        setIsTxPending(true);
+
+        try {
+            const hash = await walletClient.writeContract(request);
+            setTxHash(hash);
+            setIsTxPending(false);
+            setIsTxConfirming(true);
+            
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            
+            setIsTxConfirming(false);
+            if (receipt.status === 'success') {
+                setIsTxSuccess(true);
+            }
+        } catch (error) {
+            console.error("Transaction failed:", error);
+            setIsTxPending(false);
+            setIsTxConfirming(false);
+        }
+    }, [walletClient, publicClient, resetTx]);
+
     const handleApprove = () => {
         if (!approveResult?.request) return;
-        try {
-            writeContract(approveResult.request);
-        } catch (error) {
-            console.error("Approval failed:", error);
-        }
+        executeTransaction(approveResult.request);
     };
     
     const handleSwap = () => {
         if (!swapResult?.request) return;
-        try {
-             writeContract(swapResult.request);
-        } catch (error) {
-            console.error("Swap failed:", error);
-        }
+        executeTransaction(swapResult.request);
     }
 
     const getButtonText = () => {
@@ -274,48 +392,15 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!amountIn || parseFloat(amountIn) <= 0) return 'Enter an amount';
         return 'Swap';
     };
-    
-    // Diagnostic logging
-    useEffect(() => {
-        console.groupCollapsed("%c 🔄 Swap Diagnostics ", "color: #4C82FB; font-weight: bold;");
-        console.log("Chain ID:", chainId);
-        console.log("User Address:", address);
-        console.log("Is Supported Chain:", isSupportedChain);
-        console.log("Contracts:", contracts);
-        console.log("--- Tokens & Amounts ---");
-        console.log("Token In:", tokenIn?.symbol, tokenIn);
-        console.log("Token Out:", tokenOut?.symbol, tokenOut);
-        console.log("Amount In:", { input: amountIn, bigint: amountInBigInt.toString() });
-        console.log("Amount Out:", amountOut);
-        console.log("--- Pool ---");
-        console.log("Selected Pool:", selectedPool);
-        console.log("--- Allowance ---");
-        console.log("Allowance:", typeof allowance === 'bigint' ? formatUnits(allowance, tokenIn?.decimals || 18) : allowance);
-        console.log("Is Approval Needed:", isApprovalNeeded);
-        console.log("--- Quote Simulation ---");
-        console.log("Quote Args:", quoteArgs);
-        console.log("Is Quote Loading/Fetching:", isQuoteLoading, isQuoteFetching);
-        const qError = (quoteError as BaseError)?.shortMessage || quoteError?.message;
-        console.log("Quote Sim Result:", { result: quoteResult?.result, error: qError });
-        console.log("--- Swap Simulation ---");
-        console.log("Amount Out Minimum:", amountOutMinimum.toString());
-        console.log("Swap Args:", swapArgs);
-        const sError = (swapError as BaseError)?.shortMessage || swapError?.message;
-        console.log("Swap Sim Result:", { request: swapResult?.request, error: sError });
-        console.log("--- Transaction ---");
-        console.log("Tx Pending:", isTxPending);
-        console.log("Tx Confirming:", isTxConfirming);
-        console.log("Tx Hash:", txHash);
-        console.log("--- Button State ---");
-        const isButtonDisabled = (isWalletConnected && (!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request || !selectedPool)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)));
-        console.log("Button Text:", getButtonText());
-        console.log("Button Disabled:", isButtonDisabled);
-        console.groupEnd();
-    }, [
-        chainId, address, isSupportedChain, contracts, tokenIn, tokenOut, amountIn, amountInBigInt, amountOut,
-        selectedPool, allowance, isApprovalNeeded, quoteArgs, isQuoteLoading, isQuoteFetching, quoteResult, quoteError, amountOutMinimum,
-        swapArgs, swapResult, swapError, isTxPending, isTxConfirming, txHash, approveResult, isWalletConnected
-    ]);
+
+    const isButtonDisabled = (
+        !isWalletConnected ||
+        !isSupportedChain ||
+        isTxPending ||
+        isTxConfirming ||
+        (isApprovalNeeded && !approveResult?.request) ||
+        (!isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request || !selectedPool))
+    );
     
     if (isWalletConnected && (!isSupportedChain || !tokenIn || !tokenOut)) {
        return (
@@ -380,7 +465,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         onAmountChange={setAmountIn}
                         onTokenSelect={() => setIsSelectingFor('in')}
                         balance={balanceIn?.formatted}
-                        isBalanceLoading={isWalletConnected && !balanceIn}
+                        isBalanceLoading={isWalletConnected && isBalanceInFetching}
                     />
                     <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 my-[-12px] z-10">
                         <button onClick={handleSwapTokens} className="bg-brand-secondary hover:bg-brand-surface-2 rounded-full p-2 border-4 border-brand-surface transition-transform duration-300 ease-in-out hover:rotate-180">
@@ -394,13 +479,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                         onAmountChange={() => {}}
                         onTokenSelect={() => setIsSelectingFor('out')}
                         balance={balanceOut?.formatted}
-                        isBalanceLoading={isWalletConnected && !balanceOut}
+                        isBalanceLoading={isWalletConnected && isBalanceOutFetching}
                         isOutput={true}
                     />
                 </div>
 
                 <div className="text-sm text-brand-text-secondary p-2 text-center h-6">
-                   {isQuoteLoading ? (
+                   {isQuoteFetching ? (
                         <span className="inline-block w-48 h-4 bg-brand-surface-2 rounded animate-pulse align-middle" />
                    ) : (
                      amountIn && parseFloat(amountIn) > 0 && amountOut && `1 ${tokenIn.symbol} ≈ ${exchangeRate} ${tokenOut.symbol}`
@@ -408,8 +493,8 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 </div>
 
                 <button
-                    onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : openConnectModal}
-                    disabled={(isWalletConnected && (!isSupportedChain || isTxPending || isTxConfirming || (isWalletConnected && !isApprovalNeeded && (!amountIn || parseFloat(amountIn) <= 0 || !swapResult?.request || !selectedPool)) || (isWalletConnected && isApprovalNeeded && !approveResult?.request)))}
+                    onClick={isWalletConnected ? (isApprovalNeeded ? handleApprove : handleSwap) : () => open()}
+                    disabled={isButtonDisabled}
                     className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-4"
                 >
                     {getButtonText()}

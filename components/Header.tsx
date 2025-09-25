@@ -1,5 +1,4 @@
 import React from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { BeerMugIcon } from './icons/BeerMugIcon';
 
 const Header: React.FC = () => {
@@ -11,7 +10,8 @@ const Header: React.FC = () => {
             <BeerMugIcon className="h-8 w-8 text-brand-primary" />
             <span className="text-xl font-bold text-brand-text-primary">Cabac</span>
           </div>
-          <ConnectButton showBalance={false} />
+          {/* Fix: Use the appkit-button web component for connecting the wallet, as defined in global.d.ts */}
+          <appkit-button />
         </div>
       </div>
     </header>

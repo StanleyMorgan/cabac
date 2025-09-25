@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useAccount, useReadContracts } from 'wagmi';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useAccount, usePublicClient } from 'wagmi';
 import { baseSepolia } from 'viem/chains';
 import { formatUnits } from 'viem';
 import { POOLS_BY_CHAIN } from '../constants';
@@ -10,9 +10,6 @@ import RemoveLiquidityCard from './RemoveLiquidityCard';
 import { RefreshIcon } from './icons/RefreshIcon';
 import MyPositions from './MyPositions';
 
-// To prevent a TypeScript error "Type instantiation is excessively deep" with `useReadContracts`,
-// we define a minimal ABI containing only the `balanceOf` function. This simplifies the type
-// that TypeScript needs to process for each item in the dynamic array of contracts.
 const minimalBalanceOfAbi = [
     {
         "inputs": [ { "name": "_owner", "type": "address" } ],
@@ -24,47 +21,63 @@ const minimalBalanceOfAbi = [
 ] as const;
 
 const Pools: React.FC = () => {
-    const { chainId, isConnected } = useAccount();
+    const { isConnected, chain } = useAccount();
+    const chainId = chain?.id;
+    
     const displayChainId = chainId || baseSepolia.id;
+    
+    const publicClient = usePublicClient({ chainId: displayChainId });
 
     const basePools = useMemo(() => {
         return POOLS_BY_CHAIN[displayChainId as keyof typeof POOLS_BY_CHAIN] || [];
     }, [displayChainId]);
 
-    // FIX: Apply `as const` to each contract configuration object.
-    // This helps TypeScript infer the narrowest possible types, preventing the
-    // "Type instantiation is excessively deep" error in the `useReadContracts` hook
-    // by simplifying type resolution.
-    const contractsToRead = useMemo(() => {
-        return basePools.flatMap((pool) => [
-            {
-                address: pool.token0.address as `0x${string}`,
-                abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf',
-                // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-                args: [pool.address as `0x${string}`] as const,
-                chainId: displayChainId,
-            } as const,
-            {
-                address: pool.token1.address as `0x${string}`,
-                abi: minimalBalanceOfAbi,
-                functionName: 'balanceOf',
-                // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-                args: [pool.address as `0x${string}`] as const,
-                chainId: displayChainId,
-            } as const,
-        ]);
-    }, [basePools, displayChainId]);
+    const [balanceResults, setBalanceResults] = useState<(bigint | undefined)[]>([]);
+    const [areBalancesLoading, setAreBalancesLoading] = useState(false);
+    const [areBalancesFetching, setAreBalancesFetching] = useState(false);
 
-    const { data: balanceResults, isLoading: areBalancesLoading, isFetching: areBalancesFetching, refetch: refetchBalances } = useReadContracts({
-        contracts: contractsToRead,
-        query: { enabled: isConnected && basePools.length > 0 }
-    });
-    
+    const fetchBalances = useCallback(async () => {
+        if (!publicClient || !isConnected || basePools.length === 0) return;
+        setAreBalancesFetching(true);
+        try {
+            // Fix: Add `as const` to help with TypeScript type inference for multicall
+            const contractsToRead = basePools.flatMap((pool) => [
+                {
+                    address: pool.token0.address as `0x${string}`,
+                    abi: minimalBalanceOfAbi,
+                    functionName: 'balanceOf',
+                    args: [pool.address as `0x${string}`],
+                } as const,
+                {
+                    address: pool.token1.address as `0x${string}`,
+                    abi: minimalBalanceOfAbi,
+                    functionName: 'balanceOf',
+                    args: [pool.address as `0x${string}`],
+                } as const,
+            ]);
+
+            const results = await publicClient.multicall({
+                contracts: contractsToRead,
+            });
+
+            setBalanceResults(results.map(r => r.status === 'success' ? r.result as bigint : undefined));
+        } catch (e) {
+            console.error("Failed to fetch pool balances", e);
+            setBalanceResults([]);
+        } finally {
+            setAreBalancesFetching(false);
+        }
+    }, [publicClient, isConnected, basePools]);
+
+    useEffect(() => {
+        setAreBalancesLoading(true);
+        fetchBalances().finally(() => setAreBalancesLoading(false));
+    }, [fetchBalances]);
+
     const handleRefresh = useCallback(() => {
         if (areBalancesFetching) return;
-        void refetchBalances();
-    }, [areBalancesFetching, refetchBalances]);
+        fetchBalances();
+    }, [areBalancesFetching, fetchBalances]);
 
     const poolsWithTVL = useMemo(() => {
         if (!balanceResults || balanceResults.length === 0) {
@@ -72,15 +85,11 @@ const Pools: React.FC = () => {
         }
 
         return basePools.map((pool, index) => {
-            const balance0Result = balanceResults[index * 2];
-            const balance1Result = balanceResults[index * 2 + 1];
+            const balance0 = balanceResults[index * 2];
+            const balance1 = balanceResults[index * 2 + 1];
 
-            const balance0 = balance0Result?.status === 'success' ? (balance0Result.result as bigint) : 0n;
-            const balance1 = balance1Result?.status === 'success' ? (balance1Result.result as bigint) : 0n;
-
-            // Assuming stablecoins are pegged to $1 for TVL calculation
-            const tvl0 = parseFloat(formatUnits(balance0, pool.token0.decimals));
-            const tvl1 = parseFloat(formatUnits(balance1, pool.token1.decimals));
+            const tvl0 = balance0 ? parseFloat(formatUnits(balance0, pool.token0.decimals)) : 0;
+            const tvl1 = balance1 ? parseFloat(formatUnits(balance1, pool.token1.decimals)) : 0;
 
             return {
                 ...pool,

@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Pool, Token } from '../types';
 import { ArrowLeftIcon } from './icons/ArrowLeftIcon';
-import { useAccount, useReadContract, useSimulateContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, formatUnits, maxUint256, BaseError } from 'viem';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { baseSepolia } from 'viem/chains';
+import { parseUnits, maxUint256, BaseError } from 'viem';
 import { POOL_ABI, POSITION_MANAGER_ABI, ERC20_ABI, CONTRACT_ADDRESSES } from '../config';
 
 interface AddLiquidityCardProps {
@@ -38,15 +39,18 @@ const LabeledInput = ({ label, value, onChange, placeholder, type = 'text', disa
 // --- Uniswap V3 Math Helpers ---
 
 /**
- * Converts a price to a tick.
+ * Converts a price to a tick, rounding to the nearest tick spacing.
  * @param price The price of token0 in terms of token1.
  * @param token0 The first token.
  * @param token1 The second token.
- * @returns The tick.
+ * @param tickSpacing The tick spacing of the pool.
+ * @returns The rounded tick.
  */
-const priceToTick = (price: number, token0: Token, token1: Token): number => {
+const priceToTick = (price: number, token0: Token, token1: Token, tickSpacing: number): number => {
     const adjustedPrice = price * (10 ** (token1.decimals - token0.decimals));
-    return Math.floor(Math.log(adjustedPrice) / Math.log(1.0001));
+    const rawTick = Math.log(adjustedPrice) / Math.log(1.0001);
+    if (tickSpacing === 0) return Math.floor(rawTick);
+    return Math.floor(rawTick / tickSpacing) * tickSpacing;
 };
 
 /**
@@ -63,8 +67,14 @@ const sqrtPriceX96ToPrice = (sqrtPriceX96: bigint, token0: Token, token1: Token)
 
 
 const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => {
-    const { address, chainId } = useAccount();
+    const { address, isConnected, chain } = useAccount();
+    const chainId = chain?.id;
     const { token0, token1 } = pool;
+
+    const displayChainId = chainId || baseSepolia.id;
+
+    const publicClient = usePublicClient({ chainId: displayChainId });
+    const { data: walletClient } = useWalletClient({ chainId: displayChainId });
 
     const contracts = useMemo(() => chainId ? CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES] : undefined, [chainId]);
 
@@ -77,25 +87,70 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     // State for approvals
     const [isApproval0Needed, setIsApproval0Needed] = useState(false);
     const [isApproval1Needed, setIsApproval1Needed] = useState(false);
-
-    // Fetch pool's current state (slot0) and tick spacing
-    const { data: slot0, isLoading: isSlot0Loading } = useReadContract({
-        address: pool.address as `0x${string}`,
-        abi: POOL_ABI,
-        functionName: 'slot0',
-        chainId,
-        query: { enabled: !!chainId }
-    });
     
-    const { data: tickSpacingResult } = useReadContract({
-        address: pool.address as `0x${string}`,
-        abi: POOL_ABI,
-        functionName: 'tickSpacing',
-        chainId,
-        query: { enabled: !!chainId }
-    });
+    // State for transactions
+    const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+    const [isTxPending, setIsTxPending] = useState(false);
+    const [isTxConfirming, setIsTxConfirming] = useState(false);
+    const [isTxSuccess, setIsTxSuccess] = useState(false);
 
-    const tickSpacing = typeof tickSpacingResult === 'number' ? tickSpacingResult : 0;
+    // --- Data fetching states ---
+    const [slot0, setSlot0] = useState<readonly [bigint, number, number, number, number, number, boolean] | undefined>();
+    const [isSlot0Loading, setIsSlot0Loading] = useState(false);
+    const [tickSpacing, setTickSpacing] = useState<number>(0);
+    const [allowance0, setAllowance0] = useState<bigint | undefined>();
+    const [allowance1, setAllowance1] = useState<bigint | undefined>();
+    const [approve0Result, setApprove0Result] = useState<{ request: any } | null>(null);
+    const [approve1Result, setApprove1Result] = useState<{ request: any } | null>(null);
+    const [mintResult, setMintResult] = useState<{ request: any } | null>(null);
+    const [mintError, setMintError] = useState<Error | null>(null);
+
+    // Fetch pool data
+    useEffect(() => {
+        if (!publicClient) return;
+        setIsSlot0Loading(true);
+        publicClient.readContract({
+            address: pool.address as `0x${string}`,
+            abi: POOL_ABI,
+            functionName: 'slot0',
+        }).then(setSlot0).catch(console.error).finally(() => setIsSlot0Loading(false));
+
+        publicClient.readContract({
+            address: pool.address as `0x${string}`,
+            abi: POOL_ABI,
+            functionName: 'tickSpacing',
+        }).then(res => setTickSpacing(Number(res))).catch(console.error);
+    }, [publicClient, pool.address]);
+
+    const fetchAllowances = useCallback(async () => {
+        if (!publicClient || !address || !contracts?.POSITION_MANAGER) return;
+        try {
+            const [res0, res1] = await Promise.all([
+                publicClient.readContract({
+                    address: token0.address as `0x${string}`,
+                    abi: ERC20_ABI,
+                    functionName: 'allowance',
+                    args: [address, contracts.POSITION_MANAGER],
+                }),
+                publicClient.readContract({
+                    address: token1.address as `0x${string}`,
+                    abi: ERC20_ABI,
+                    functionName: 'allowance',
+                    args: [address, contracts.POSITION_MANAGER],
+                })
+            ]);
+            setAllowance0(res0);
+            setAllowance1(res1);
+        } catch (e) {
+            console.error("Failed to fetch allowances", e);
+        }
+    }, [publicClient, address, contracts, token0, token1]);
+
+    useEffect(() => {
+        if (isConnected) {
+            fetchAllowances();
+        }
+    }, [isConnected, fetchAllowances]);
     
     // Calculate current price from slot0
     const currentPrice = useMemo(() => {
@@ -115,235 +170,193 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     // Memoize BigInt conversions for amounts and ticks
     const amount0BigInt = useMemo(() => amount0 ? parseUnits(amount0, token0.decimals) : 0n, [amount0, token0.decimals]);
     const amount1BigInt = useMemo(() => amount1 ? parseUnits(amount1, token1.decimals) : 0n, [amount1, token1.decimals]);
+    const tickLower = useMemo(() => priceLower ? priceToTick(parseFloat(priceLower), token0, token1, tickSpacing) : 0, [priceLower, token0, token1, tickSpacing]);
+    const tickUpper = useMemo(() => priceUpper ? priceToTick(parseFloat(priceUpper), token0, token1, tickSpacing) : 0, [priceUpper, token0, token1, tickSpacing]);
 
-    const tickLower = useMemo(() => {
-        const pLower = parseFloat(priceLower);
-        if (!pLower || !tickSpacing) return undefined;
-        const tick = priceToTick(pLower, token0, token1);
-        return Math.floor(tick / tickSpacing) * tickSpacing;
-    }, [priceLower, token0, token1, tickSpacing]);
-
-    const tickUpper = useMemo(() => {
-        const pUpper = parseFloat(priceUpper);
-        if (!pUpper || !tickSpacing) return undefined;
-        const tick = priceToTick(pUpper, token0, token1);
-        return Math.ceil(tick / tickSpacing) * tickSpacing;
-    }, [priceUpper, token0, token1, tickSpacing]);
-    
-    // Check allowances
-    const { data: allowance0Result, refetch: refetchAllowance0 } = useReadContract({
-        address: token0.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] as const : undefined,
-        chainId,
-        query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
-    });
-    const allowance0 = allowance0Result as bigint | undefined;
-
-    const { data: allowance1Result, refetch: refetchAllowance1 } = useReadContract({
-        address: token1.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: (address && contracts?.POSITION_MANAGER) ? [address, contracts.POSITION_MANAGER] as const : undefined,
-        chainId,
-        query: { enabled: !!address && !!contracts?.POSITION_MANAGER }
-    });
-    const allowance1 = allowance1Result as bigint | undefined;
-    
     useEffect(() => {
-        setIsApproval0Needed(typeof allowance0 === 'bigint' && amount0BigInt > 0n && allowance0 < amount0BigInt);
-        setIsApproval1Needed(typeof allowance1 === 'bigint' && amount1BigInt > 0n && allowance1 < amount1BigInt);
+        setIsApproval0Needed(!!allowance0 && allowance0 < amount0BigInt);
+        setIsApproval1Needed(!!allowance1 && allowance1 < amount1BigInt);
     }, [allowance0, allowance1, amount0BigInt, amount1BigInt]);
 
-    // Transaction simulation hooks
-    const { data: approve0Result, error: approve0Error } = useSimulateContract({
-        address: token0.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] as const : undefined,
-        query: { enabled: isApproval0Needed && !!contracts?.POSITION_MANAGER }
-    });
-
-    const { data: approve1Result, error: approve1Error } = useSimulateContract({
-        address: token1.address as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: contracts?.POSITION_MANAGER ? [contracts.POSITION_MANAGER, maxUint256] as const : undefined,
-        query: { enabled: !isApproval0Needed && isApproval1Needed && !!contracts?.POSITION_MANAGER }
-    });
-
-    const mintParams = useMemo(() => {
-        if (!address || tickLower === undefined || tickUpper === undefined || (amount0BigInt <= 0n && amount1BigInt <= 0n)) return undefined;
-        return {
-            token0: token0.address as `0x${string}`,
-            token1: token1.address as `0x${string}`,
-            // FIX: Use the pool's fee from props instead of a hardcoded value.
-            fee: pool.fee,
-            tickLower: tickLower,
-            tickUpper: tickUpper,
-            amount0Desired: amount0BigInt,
-            amount1Desired: amount1BigInt,
-            amount0Min: 0n,
-            amount1Min: 0n,
-            recipient: address,
-            deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
-        };
-    }, [address, token0, token1, tickLower, tickUpper, amount0BigInt, amount1BigInt, pool]);
-
-    const { data: mintResult, isError: isMintSimError, error: mintError } = useSimulateContract({
-        address: contracts?.POSITION_MANAGER,
-        abi: POSITION_MANAGER_ABI,
-        functionName: 'mint',
-        // FIX: Add `as const` to ensure TypeScript infers a tuple type for `args`, which is required for wagmi's type inference.
-        args: mintParams ? [mintParams] as const : undefined,
-        query: { enabled: !!mintParams && !isApproval0Needed && !isApproval1Needed }
-    });
-
-    const { writeContract, data: txHash, isPending: isTxPending, reset } = useWriteContract();
-    const { isLoading: isTxConfirming, isSuccess: isTxSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+    const resetTx = useCallback(() => {
+        setTxHash(undefined);
+        setIsTxPending(false);
+        setIsTxConfirming(false);
+        setIsTxSuccess(false);
+    }, []);
 
     useEffect(() => {
         if (isTxSuccess) {
-            void refetchAllowance0();
-            void refetchAllowance1();
-            reset();
+            fetchAllowances(); // Re-fetch allowances after a successful transaction
+            resetTx();
         }
-    }, [isTxSuccess, reset, refetchAllowance0, refetchAllowance1]);
+    }, [isTxSuccess, resetTx, fetchAllowances]);
 
-    const handleApprove = (request: any) => {
-        if (!request) return;
-        writeContract(request);
-    };
+    const executeTransaction = useCallback(async (request: any) => {
+        if (!walletClient || !request || !publicClient) return;
+        
+        resetTx();
+        setIsTxPending(true);
 
-    const handleMint = () => {
-        if (!mintResult?.request) return;
-        writeContract(mintResult.request);
-    };
+        try {
+            const hash = await walletClient.writeContract(request);
+            setTxHash(hash);
+            setIsTxPending(false);
+            setIsTxConfirming(true);
+            
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            
+            setIsTxConfirming(false);
+            if (receipt.status === 'success') {
+                setIsTxSuccess(true);
+            }
+        } catch (error) {
+            console.error("Transaction failed:", error);
+            setIsTxPending(false);
+            setIsTxConfirming(false);
+        }
+    }, [walletClient, publicClient, resetTx]);
 
-    // Diagnostic logging
+    // --- Simulations ---
+    const simulateApprove = useCallback(async (token: Token, setResult: Function) => {
+        if (!publicClient || !address || !contracts?.POSITION_MANAGER) {
+             setResult(null);
+             return;
+        }
+        try {
+            const { request } = await publicClient.simulateContract({
+                address: token.address as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'approve',
+                args: [contracts.POSITION_MANAGER, maxUint256],
+                account: address as `0x${string}`,
+            });
+            setResult({ request });
+        } catch (e) {
+            console.error(`Approve simulation failed for ${token.symbol}:`, e);
+            setResult(null);
+        }
+    }, [publicClient, address, contracts]);
+
+    useEffect(() => { if (isApproval0Needed) simulateApprove(token0, setApprove0Result); else setApprove0Result(null); }, [isApproval0Needed, simulateApprove, token0]);
+    useEffect(() => { if (isApproval1Needed) simulateApprove(token1, setApprove1Result); else setApprove1Result(null); }, [isApproval1Needed, simulateApprove, token1]);
+
+    const simulateMint = useCallback(async () => {
+        if (!publicClient || !address || !contracts?.POSITION_MANAGER || isApproval0Needed || isApproval1Needed || amount0BigInt <= 0n || amount1BigInt <= 0n || tickLower >= tickUpper) {
+            setMintResult(null);
+            return;
+        }
+        setMintError(null);
+        try {
+            const mintParams = {
+                token0: token0.address as `0x${string}`,
+                token1: token1.address as `0x${string}`,
+                fee: pool.fee,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
+                amount0Desired: amount0BigInt,
+                amount1Desired: amount1BigInt,
+                amount0Min: 0n, // Simplification: we're not calculating this
+                amount1Min: 0n, // Simplification: we're not calculating this
+                recipient: address,
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
+            };
+            const { request } = await publicClient.simulateContract({
+                address: contracts.POSITION_MANAGER,
+                abi: POSITION_MANAGER_ABI,
+                functionName: 'mint',
+                args: [mintParams],
+                account: address as `0x${string}`,
+            });
+            setMintResult({ request });
+        } catch (e) {
+            console.error("Mint simulation failed:", e);
+            setMintError(e as Error);
+            setMintResult(null);
+        }
+    }, [publicClient, address, contracts, token0, token1, pool.fee, tickLower, tickUpper, amount0BigInt, amount1BigInt, isApproval0Needed, isApproval1Needed]);
+
     useEffect(() => {
-        console.groupCollapsed("%c 💧 Add Liquidity Diagnostics ", "color: #4C82FB; font-weight: bold;");
-        console.log("Chain ID:", chainId);
-        console.log("User Address:", address);
-        console.log("Contracts:", contracts);
-        console.log("Pool:", pool);
-        console.log("--- Amounts ---");
-        console.log(`Amount 0 (${token0.symbol}):`, { input: amount0, bigint: amount0BigInt.toString() });
-        console.log(`Amount 1 (${token1.symbol}):`, { input: amount1, bigint: amount1BigInt.toString() });
-        console.log("--- Price Range ---");
-        console.log("Current Price:", currentPrice?.toPrecision(5) ?? "Loading...");
-        console.log("Lower Price Input:", priceLower);
-        console.log("Upper Price Input:", priceUpper);
-        console.log("--- Ticks ---");
-        console.log("Tick Lower (calculated):", tickLower);
-        console.log("Tick Upper (calculated):", tickUpper);
-        console.log("Tick Spacing:", tickSpacing);
-        console.log("--- Approvals ---");
-        console.log(`Token 0 Allowance:`, typeof allowance0 === 'bigint' ? formatUnits(allowance0, token0.decimals) : allowance0);
-        console.log(`Is Approval 0 Needed:`, isApproval0Needed);
-        console.log(`Token 1 Allowance:`, typeof allowance1 === 'bigint' ? formatUnits(allowance1, token1.decimals) : allowance1);
-        console.log(`Is Approval 1 Needed:`, isApproval1Needed);
-        console.log("--- Simulations ---");
-        console.log("Approve 0 Sim:", { request: approve0Result?.request, error: approve0Error?.message });
-        console.log("Approve 1 Sim:", { request: approve1Result?.request, error: approve1Error?.message });
-        console.log("Mint Params:", mintParams);
-        console.log("Mint Sim:", { request: mintResult?.request, isError: isMintSimError, error: (mintError as BaseError)?.shortMessage || mintError?.message });
-        console.log("--- Transaction ---");
-        console.log("Tx Pending:", isTxPending);
-        console.log("Tx Confirming:", isTxConfirming);
-        console.log("Tx Hash:", txHash);
-        console.groupEnd();
-    }, [
-        chainId, address, contracts, pool, token0, token1, amount0, amount1, amount0BigInt, amount1BigInt,
-        currentPrice, priceLower, priceUpper, tickLower, tickUpper, tickSpacing,
-        allowance0, allowance1, isApproval0Needed, isApproval1Needed,
-        approve0Result, approve0Error, approve1Result, approve1Error, mintParams, mintResult, isMintSimError, mintError,
-        isTxPending, isTxConfirming, txHash
-    ]);
+        simulateMint();
+    }, [simulateMint]);
 
+    const handleApprove0 = () => approve0Result?.request && executeTransaction(approve0Result.request);
+    const handleApprove1 = () => approve1Result?.request && executeTransaction(approve1Result.request);
+    const handleMint = () => mintResult?.request && executeTransaction(mintResult.request);
 
-    const getButtonAction = () => {
-        if (!address) {
-            return { text: 'Connect Wallet', action: () => {}, disabled: true };
-        }
-        if (isTxPending) return { text: 'Check Wallet...', action: () => {}, disabled: true };
-        if (isTxConfirming) return { text: 'Transaction Confirming...', action: () => {}, disabled: true };
-        
-        if (isApproval0Needed) {
-            return { text: `Approve ${token0.symbol}`, action: () => handleApprove(approve0Result?.request), disabled: !approve0Result?.request };
-        }
-        if (isApproval1Needed) {
-            return { text: `Approve ${token1.symbol}`, action: () => handleApprove(approve1Result?.request), disabled: !approve1Result?.request };
-        }
-
-        if (amount0BigInt <= 0n && amount1BigInt <= 0n) {
-             return { text: 'Enter an amount', action: () => {}, disabled: true };
-        }
-        
-        if (isMintSimError) {
-             return { text: 'Cannot Add Liquidity', action: () => {}, disabled: true };
-        }
-
-        return { text: 'Add Liquidity', action: handleMint, disabled: !mintResult?.request };
+    const getButtonText = () => {
+        if (!isConnected) return 'Connect Wallet';
+        if (isTxPending) return 'Check Wallet...';
+        if (isTxConfirming) return 'Transaction Confirming...';
+        if (isApproval0Needed) return `Approve ${token0.symbol}`;
+        if (isApproval1Needed) return `Approve ${token1.symbol}`;
+        return 'Add Liquidity';
     };
 
-    const { text: buttonText, action: buttonAction, disabled: isButtonDisabled } = getButtonAction();
+    const isButtonDisabled = (
+        !isConnected ||
+        isTxPending ||
+        isTxConfirming ||
+        (isApproval0Needed && !approve0Result?.request) ||
+        (!isApproval0Needed && isApproval1Needed && !approve1Result?.request) ||
+        (!isApproval0Needed && !isApproval1Needed && !mintResult?.request) ||
+        !amount0 || !amount1 || !priceLower || !priceUpper
+    );
+
+    const handleButtonClick = () => {
+        if (!isConnected) return; // Should not happen if button is disabled, but good practice
+        if (isApproval0Needed) return handleApprove0();
+        if (isApproval1Needed) return handleApprove1();
+        return handleMint();
+    };
+
+    if (!isConnected) {
+        return (
+            <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary text-center">
+                 <div className="flex items-center mb-6">
+                    <button onClick={onBack} className="mr-3 text-brand-text-secondary hover:text-brand-text-primary">
+                        <ArrowLeftIcon className="w-6 h-6" />
+                    </button>
+                    <h2 className="text-xl font-bold">Add Liquidity</h2>
+                </div>
+                <p className="text-brand-text-secondary py-12">Please connect your wallet to add liquidity.</p>
+            </div>
+        )
+    }
 
     return (
         <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
-            <div className="flex items-center mb-4">
+            <div className="flex items-center mb-6">
                 <button onClick={onBack} className="mr-3 text-brand-text-secondary hover:text-brand-text-primary">
                     <ArrowLeftIcon className="w-6 h-6" />
                 </button>
-                <div className="flex items-center">
-                    <div className="flex -space-x-2 mr-3">
-                        <img src={token0.logoURI} alt={token0.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface" />
-                        <img src={token1.logoURI} alt={token1.symbol} className="w-7 h-7 rounded-full border-2 border-brand-surface" />
-                    </div>
-                    <h2 className="text-xl font-bold">Add Liquidity</h2>
-                </div>
+                <h2 className="text-xl font-bold">Add Liquidity for {token0.symbol}/{token1.symbol}</h2>
             </div>
 
-            <div className="bg-brand-surface-2 p-4 rounded-xl">
-                 <LabeledInput
-                    label={`Amount of ${token0.symbol}`}
-                    value={amount0}
-                    onChange={setAmount0}
-                    placeholder="0.0"
-                    type="number"
-                />
-                 <LabeledInput
-                    label={`Amount of ${token1.symbol}`}
-                    value={amount1}
-                    onChange={setAmount1}
-                    placeholder="0.0"
-                    type="number"
-                />
+            <LabeledInput label={`Amount of ${token0.symbol}`} value={amount0} onChange={setAmount0} placeholder="0.0" type="number" />
+            <LabeledInput label={`Amount of ${token1.symbol}`} value={amount1} onChange={setAmount1} placeholder="0.0" type="number" />
+
+            <div className="my-4">
+                <p className="text-sm text-center text-brand-text-secondary">Current price: {currentPrice ? currentPrice.toPrecision(5) : 'Loading...'} {token1.symbol} per {token0.symbol}</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+                <LabeledInput label="Min Price" value={priceLower} onChange={setPriceLower} placeholder="0.0" type="number" />
+                <LabeledInput label="Max Price" value={priceUpper} onChange={setPriceUpper} placeholder="0.0" type="number" />
             </div>
 
-            <div className="bg-brand-surface-2 p-4 rounded-xl mt-4">
-                <h3 className="font-semibold mb-2">Set Price Range</h3>
-                 <div className="text-sm text-brand-text-secondary text-center mb-3">
-                     Current Price: {isSlot0Loading ? 'Loading...' : currentPrice?.toPrecision(5) ?? 'N/A'} {token1.symbol} per {token0.symbol}
-                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <LabeledInput label="Min Price" value={priceLower} onChange={setPriceLower} placeholder="0.0" type="number" />
-                    <LabeledInput label="Max Price" value={priceUpper} onChange={setPriceUpper} placeholder="0.0" type="number" />
-                </div>
-            </div>
-
-             <button
-                onClick={buttonAction}
+            <button
+                onClick={handleButtonClick}
                 disabled={isButtonDisabled}
                 className="w-full bg-brand-primary text-white text-lg font-bold py-3 rounded-xl hover:bg-brand-primary-hover disabled:bg-brand-secondary disabled:cursor-not-allowed transition-all mt-6"
             >
-                {buttonText}
+                {getButtonText()}
             </button>
+            {mintError && (
+                <p className="text-sm text-brand-accent mt-2 text-center">
+                    {mintError instanceof BaseError ? mintError.shortMessage : mintError.message}
+                </p>
+            )}
         </div>
     );
 };
