@@ -1,13 +1,12 @@
-import 'react';
+import type React from 'react';
 
 declare global {
   namespace JSX {
     interface IntrinsicElements {
       /**
        * The AppKit button web component. Registered globally by AppKit.
-       * FIX: Using `any` to avoid complex type resolution errors and conflicts.
        */
-      'appkit-button': any;
+      'appkit-button': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
     }
   }
 }

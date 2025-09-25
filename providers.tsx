@@ -10,6 +10,11 @@ if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID) {
 }
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
+if (!import.meta.env.VITE_ALCHEMY_API_KEY) {
+    throw new Error('VITE_ALCHEMY_API_KEY is not set in .env file');
+}
+const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+
 
 // 2. Create wagmiConfig
 const metadata = {
@@ -27,8 +32,8 @@ const config = createConfig({
     // safe(),
   ],
   transports: {
-    [sepolia.id]: http(),
-    [baseSepolia.id]: http(),
+    [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
+    [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
   },
 })
 

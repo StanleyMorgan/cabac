@@ -43,20 +43,36 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [isSwapping, setIsSwapping] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const { data: balanceIn, isLoading: isBalanceInLoading } = useBalance({
+    const { data: balanceIn, isLoading: isBalanceInLoading, refetch: refetchBalanceIn } = useBalance({
         address,
         token: tokenIn.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn.address as `0x${string}`,
         chainId: chainId,
     });
-     const { data: balanceOut, isLoading: isBalanceOutLoading } = useBalance({
+     const { data: balanceOut, isLoading: isBalanceOutLoading, refetch: refetchBalanceOut } = useBalance({
         address,
         token: tokenOut.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenOut.address as `0x${string}`,
         chainId: chainId,
     });
 
     useEffect(() => {
-        setTokenIn(tokens[0]);
-        setTokenOut(tokens[1]);
+        console.log(`Balance In for ${tokenIn?.symbol}:`, {
+            balance: balanceIn?.formatted,
+            isLoading: isBalanceInLoading,
+        });
+    }, [balanceIn, isBalanceInLoading, tokenIn?.symbol]);
+
+    useEffect(() => {
+        console.log(`Balance Out for ${tokenOut?.symbol}:`, {
+            balance: balanceOut?.formatted,
+            isLoading: isBalanceOutLoading,
+        });
+    }, [balanceOut, isBalanceOutLoading, tokenOut?.symbol]);
+
+    useEffect(() => {
+        if (tokens.length > 0) {
+            setTokenIn(tokens[0]);
+            setTokenOut(tokens[1]);
+        }
     }, [tokens]);
 
     useEffect(() => {
@@ -91,7 +107,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     };
 
     const handleSwap = async () => {
-        if (!walletClient || !address || !chain) return;
+        if (!walletClient || !address || !chain || !publicClient) return;
 
         setError(null);
         
@@ -101,19 +117,22 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             
             if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
                 setIsApproving(true);
+                 // FIX: Cast to any to work around a deep type instantiation issue in viem.
                  const allowance = await publicClient.readContract({
                     address: tokenIn.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'allowance',
                     args: [address, routerAddress],
-                });
+                } as any);
 
                 if (allowance < amountInParsed) {
+                    // FIX: Add chain parameter to writeContract call.
                     const approveTx = await walletClient.writeContract({
                         address: tokenIn.address as `0x${string}`,
                         abi: ERC20_ABI,
                         functionName: 'approve',
                         args: [routerAddress, amountInParsed],
+                        chain,
                     });
                     await publicClient.waitForTransactionReceipt({ hash: approveTx });
                 }
@@ -123,26 +142,31 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             setIsSwapping(true);
             const amountOutMinimum = parseUnits(amountOut, tokenOut.decimals) * BigInt(10000 - Math.floor(slippage * 100)) / BigInt(10000);
 
+            // FIX: Ensure deadline and sqrtPriceLimitX96 are bigints.
             const swapParams = {
                 tokenIn: tokenIn.address as `0x${string}`,
                 tokenOut: tokenOut.address as `0x${string}`,
                 fee: 3000,
                 recipient: address,
-                deadline: Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes from now
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20), // 20 minutes from now
                 amountIn: amountInParsed,
                 amountOutMinimum: amountOutMinimum,
-                sqrtPriceLimitX96: 0,
+                sqrtPriceLimitX96: 0n,
             };
 
+            // FIX: Add chain parameter to writeContract call.
             const swapTx = await walletClient.writeContract({
                 address: routerAddress,
                 abi: ROUTER_ABI,
                 functionName: 'exactInputSingle',
                 args: [swapParams],
                 value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : BigInt(0),
+                chain,
             });
              await publicClient.waitForTransactionReceipt({ hash: swapTx });
             
+            refetchBalanceIn();
+            refetchBalanceOut();
             setAmountIn('');
             setAmountOut('');
 
@@ -162,7 +186,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (isApproving) return 'Approving...';
         if (isSwapping) return 'Swapping...';
         if (!amountIn) return 'Enter an amount';
-         if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn.symbol} balance`;
+         if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
         return 'Swap';
     }
 

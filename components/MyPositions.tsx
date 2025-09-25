@@ -36,19 +36,25 @@ const MyPositions: React.FC = () => {
                 return;
             };
 
+            console.log("MyPositions: Starting to fetch positions for address:", address, "on chain:", chain.id);
             setIsLoading(true);
             try {
                 const positionManagerAddress = CONTRACT_ADDRESSES[chain.id].POSITION_MANAGER;
+                console.log("MyPositions: Using Position Manager address:", positionManagerAddress);
 
+                // FIX: Cast to any to work around a deep type instantiation issue in viem.
                 const balance = await publicClient.readContract({
                     address: positionManagerAddress,
                     abi: POSITION_MANAGER_ABI,
                     functionName: 'balanceOf',
                     args: [address],
-                });
+                } as any);
+                console.log("MyPositions: NFT balance (position count):", balance.toString());
+
 
                 if (balance === BigInt(0)) {
                     setPositions([]);
+                    console.log("MyPositions: No positions found. Halting fetch.");
                     return;
                 }
 
@@ -59,8 +65,10 @@ const MyPositions: React.FC = () => {
                     args: [address, BigInt(i)],
                 }));
 
+                console.log("MyPositions: Fetching token IDs...");
                 const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsCalls } as any);
                 const tokenIds = tokenIdsResults.filter(r => r.status === 'success').map(r => r.result as bigint);
+                console.log("MyPositions: Fetched Token IDs:", tokenIds.map(id => id.toString()));
 
                 const positionsCalls = tokenIds.map(tokenId => ({
                     address: positionManagerAddress,
@@ -69,7 +77,10 @@ const MyPositions: React.FC = () => {
                     args: [tokenId],
                 }));
                 
+                console.log("MyPositions: Fetching position details for", tokenIds.length, "tokens...");
                 const positionsResults = await publicClient.multicall({ contracts: positionsCalls } as any);
+                console.log("MyPositions: Position details results raw:", positionsResults);
+
 
                 const fetchedPositions: Position[] = positionsResults
                     .map((r, i) => ({ result: r.result, tokenId: tokenIds[i] }))
@@ -79,7 +90,10 @@ const MyPositions: React.FC = () => {
                         const token0 = tokensForChain.get(posData[2].toLowerCase());
                         const token1 = tokensForChain.get(posData[3].toLowerCase());
 
-                        if (!token0 || !token1) return null;
+                        if (!token0 || !token1) {
+                            console.warn("MyPositions: Could not find token definitions for position", item.tokenId.toString(), "with token addresses", posData[2], posData[3]);
+                            return null;
+                        };
 
                         return {
                             id: item.tokenId,
@@ -90,14 +104,16 @@ const MyPositions: React.FC = () => {
                         };
                     })
                     .filter((p): p is Position => p !== null);
-
+                
+                console.log("MyPositions: Final parsed positions:", fetchedPositions);
                 setPositions(fetchedPositions);
 
             } catch (error) {
-                console.error("Failed to fetch positions:", error);
+                console.error("MyPositions: Failed to fetch positions:", error);
                 setPositions([]);
             } finally {
                 setIsLoading(false);
+                console.log("MyPositions: Fetching complete.");
             }
         };
 
