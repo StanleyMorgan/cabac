@@ -8,30 +8,27 @@ import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { createAppKit } from '@reown/appkit/react';
 import type { Chain } from 'viem';
 
+// --- DEBUG LOGGING ---
+console.groupCollapsed('%c[providers.tsx] AppKit & Wagmi Configuration', 'color: #ffa500; font-weight: bold;');
 console.log("providers.tsx: Script loading...");
 
 // 1. Получаем projectId из https://cloud.walletconnect.com
-console.log("providers.tsx: Checking for VITE_WALLETCONNECT_PROJECT_ID...");
-console.log("providers.tsx: VITE_WALLETCONNECT_PROJECT_ID value:", import.meta.env.VITE_WALLETCONNECT_PROJECT_ID);
 if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID) {
     console.error("providers.tsx: VITE_WALLETCONNECT_PROJECT_ID is not set! This is a critical error.");
     throw new Error('VITE_WALLETCONNECT_PROJECT_ID is not set')
 }
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
-console.log("providers.tsx: VITE_WALLETCONNECT_PROJECT_ID found.");
+console.log("providers.tsx: WalletConnect Project ID:", projectId);
 
 
 // 2. Получаем Alchemy API Key
-console.log("providers.tsx: Checking for VITE_ALCHEMY_API_KEY...");
-console.log("providers.tsx: VITE_ALCHEMY_API_KEY value:", import.meta.env.VITE_ALCHEMY_API_KEY);
 if (!import.meta.env.VITE_ALCHEMY_API_KEY) {
     console.error("providers.tsx: VITE_ALCHEMY_API_KEY is not set! This is a critical error.");
     throw new Error('VITE_ALCHEMY_API_KEY is not set. Please add it to your environment variables.');
 }
 const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
-console.log("providers.tsx: VITE_ALCHEMY_API_KEY found.");
+console.log("providers.tsx: Alchemy API Key is set (value hidden for security).");
 
-// Определяем метаданные для модального окна WalletConnect
 const metadata = {
   name: 'Cabac Swap',
   description: 'A simple and efficient token swap application.',
@@ -39,35 +36,26 @@ const metadata = {
   icons: ['https://avatars.githubusercontent.com/u/37784886']
 }
 
-// Определяем поддерживаемые сети
 const networks: [Chain, ...Chain[]] = [sepolia, baseSepolia];
+console.log("providers.tsx: Supported Networks:", networks.map(n => n.name));
 
-// FIX: Pass custom transports directly to the WagmiAdapter.
-// This ensures a single wagmi config is created and shared between AppKit and wagmi hooks,
-// preventing state desynchronization and resolving the connector type error.
-console.log("providers.tsx: Creating Alchemy transports...");
 const transports = {
     [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
     [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
 };
-console.log("providers.tsx: Transports created:", transports);
+console.log("providers.tsx: Alchemy transports configured for chains:", Object.keys(transports));
 
-// Создаем экземпляр адаптера Wagmi для Reown AppKit, предоставляя кастомные транспорты
-console.log("providers.tsx: Creating WagmiAdapter...");
+console.log("providers.tsx: Creating WagmiAdapter with the following config:", { projectId, networks, transports: '...' });
 const wagmiAdapter = new WagmiAdapter({
   projectId,
   networks,
   transports,
 });
-console.log("providers.tsx: WagmiAdapter created.");
 
-// Используем конфигурацию, сгенерированную адаптером, которая теперь включает наши кастомные транспорты
 const config = wagmiAdapter.wagmiConfig;
-console.log("providers.tsx: Wagmi config obtained from adapter:", config);
+console.log("providers.tsx: Wagmi config obtained from adapter. This config will be used by WagmiProvider and AppKit:", config);
 
-
-// Инициализируем AppKit глобально. Это регистрирует веб-компонент <appkit-button />.
-console.log("providers.tsx: Creating AppKit...");
+console.log("providers.tsx: Initializing AppKit globally...");
 createAppKit({
   adapters: [wagmiAdapter],
   projectId,
@@ -75,11 +63,12 @@ createAppKit({
   metadata,
   defaultNetwork: baseSepolia,
 });
-console.log("providers.tsx: AppKit created.");
+console.log("providers.tsx: AppKit initialized.");
 
-// Создаем QueryClient для react-query
 const queryClient = new QueryClient();
 console.log("providers.tsx: QueryClient created.");
+console.groupEnd();
+// --- END DEBUG LOGGING ---
 
 // ErrorBoundary для отладки ошибок рендеринга
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -118,7 +107,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 // Создаем основной компонент AppProviders
 export const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log("providers.tsx: AppProviders component rendering...");
+  console.log("%c[providers.tsx] AppProviders rendering with WagmiProvider...", 'color: #lightblue;');
   return (
     // Используем конфигурацию от адаптера с RPC от Alchemy
     <WagmiProvider config={config}>

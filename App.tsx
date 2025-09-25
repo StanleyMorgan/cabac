@@ -1,12 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useBalance } from 'wagmi';
 import Header from './components/Header';
 import SwapCard from './components/SwapCard';
 import Pools from './components/Pools';
 
 const App: React.FC = () => {
-  const { isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const [activeTab, setActiveTab] = useState<'swap' | 'pools'>('swap');
+
+  // --- DEBUG LOGGING ---
+  // Добавляем хук useBalance здесь, чтобы проверить нативный баланс на верхнем уровне приложения.
+  // Это "источник правды" для сравнения с тем, что показывает AppKit.
+  const { data: nativeBalance, isSuccess } = useBalance({ address, chainId });
+
+  useEffect(() => {
+    if (isConnected && isSuccess) {
+      console.log(
+        '%c[App.tsx] Native Balance Check:', 
+        'color: #00ff00; font-weight: bold;', 
+        {
+          formatted: nativeBalance.formatted,
+          symbol: nativeBalance.symbol,
+          value: nativeBalance.value.toString(),
+        }
+      );
+    } else if (isConnected && !isSuccess) {
+        console.warn('[App.tsx] Native Balance Hook: Connected, but failed to fetch balance.');
+    }
+  }, [nativeBalance, isConnected, isSuccess]);
+  // --- END DEBUG LOGGING ---
 
   useEffect(() => {
     console.log("App.tsx: Component successfully mounted.");
