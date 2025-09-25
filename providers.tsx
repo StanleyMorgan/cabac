@@ -25,6 +25,7 @@ const queryClient = new QueryClient();
 // 2. Create the wagmi adapter
 const wagmiAdapter = new WagmiAdapter({
     projectId,
+    // FIX: The AppKit WagmiAdapter expects the property to be `networks`, not `chains`.
     networks: [sepolia, baseSepolia],
     transports: {
         [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
@@ -45,6 +46,8 @@ createAppKit({
 
 // 4. Get the wagmiConfig from the adapter
 const wagmiConfig = wagmiAdapter.wagmiConfig;
+console.log(`providers.tsx: wagmiConfig created: ${wagmiConfig ? 'success' : 'FAILED'}`);
+
 
 // 5. AppProviders must include both WagmiProvider and QueryClientProvider.
 // Wagmi hooks depend on the context provided by both to function correctly.
