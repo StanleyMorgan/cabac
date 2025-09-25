@@ -1,4 +1,3 @@
-
 import 'react';
 
 declare global {
@@ -6,8 +5,9 @@ declare global {
     interface IntrinsicElements {
       /**
        * The AppKit button web component. Registered globally by AppKit.
+       * FIX: Using `any` to avoid complex type resolution errors and conflicts.
        */
-      'appkit-button': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'appkit-button': any;
     }
   }
 }
