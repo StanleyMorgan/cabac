@@ -1,6 +1,7 @@
 import React from 'react';
 import { WagmiProvider, http, type Config } from 'wagmi';
 import { sepolia, baseSepolia } from 'viem/chains';
+import { type Chain } from 'viem';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
@@ -36,11 +37,14 @@ try {
 
     queryClient = new QueryClient();
 
+    // FIX: Define `chains` as a mutable, non-empty array tuple to satisfy AppKit's type requirements.
+    // The previous `as const` assertion created a `readonly` array, causing type conflicts.
+    const chains: [Chain, ...Chain[]] = [sepolia, baseSepolia];
+
     // Create the adapter
     const wagmiAdapter = new WagmiAdapter({
         projectId,
-        // The adapter expects 'networks'
-        networks: [sepolia, baseSepolia],
+        networks: chains,
         transports: {
             [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
             [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
@@ -53,13 +57,15 @@ try {
     // Create the AppKit instance
     createAppKit({
         adapters: [wagmiAdapter],
+        // FIX: The top-level AppKit config requires the networks array directly.
+        networks: chains,
         metadata: {
             name: 'Cabac',
             description: 'A decentralized exchange (DEX) interface for swapping tokens.',
             url: 'https://cabac.netlify.app',
             icons: ['https://cabac.netlify.app/favicon.ico'],
         }
-    } as any);
+    });
     console.log("providers.tsx: AppKit initialized.");
 } catch (e: any) {
     initializationError = e;
