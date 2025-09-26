@@ -45,10 +45,12 @@ try {
     wagmiConfig = wagmiAdapter.wagmiConfig;
     console.log("providers.tsx: wagmiConfig created successfully");
 
-    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Возвращаем параметр `networks`!
-    // AppKit ожидает список сетей напрямую, даже если он уже есть в адаптере.
-    // Это решает ошибку "Cannot read properties of undefined (reading 'map')".
+    // ✅ ИСПРАВЛЕНИЕ: Передаем `projectId` напрямую в `createAppKit`.
+    // Несмотря на то что `projectId` уже есть в адаптере,
+    // UI-компонентам AppKit (например, модальному окну) он может требоваться
+    // на верхнем уровне конфигурации для корректной инициализации WalletConnect.
     createAppKit({
+        projectId,
         networks: chains,
         adapters: [wagmiAdapter], 
         metadata: {
