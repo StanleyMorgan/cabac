@@ -53,8 +53,14 @@ const App: React.FC = () => {
                     Swap
                 </button>
                 <button
-                    onClick={() => setActiveTab('pools')}
-                    className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${getTabClass('pools')}`}
+                    onClick={() => {
+                        if (isConnected) {
+                            setActiveTab('pools');
+                        }
+                    }}
+                    disabled={!isConnected}
+                    title={!isConnected ? "Connect your wallet to view pools" : ""}
+                    className={`px-6 py-2 rounded-lg font-semibold transition-colors duration-200 ${getTabClass('pools')} disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                     Pools
                 </button>
