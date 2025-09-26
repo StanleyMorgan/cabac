@@ -87,7 +87,7 @@ const CELO_ON_CELO_SEPOLIA: Token = {
     address: '0x471EcE3750Da237f93B8E339c536989b8978a438',
     symbol: 'CELO', // Not WCELO for better UX
     name: 'Celo', // Not "Wrapped Celo"
-    logoURI: 'https://assets.coingecko.com/coins/images/8672/small/Celo_Gold.png',
+    logoURI: 'https://i.imgur.com/h43XIEb.png',
     decimals: 18,
 };
 
