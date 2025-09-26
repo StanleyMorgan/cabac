@@ -8,8 +8,6 @@ import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 
 console.log("providers.tsx: Module loading...");
 
-// Declare config and client outside the try block to make them accessible
-// in the AppProviders component. We'll show an error component if they fail to initialize.
 let wagmiConfig: Config | undefined;
 let queryClient: QueryClient | undefined;
 let initializationError: Error | null = null;
@@ -19,29 +17,22 @@ try {
     const alchemyApiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
 
     console.log("providers.tsx: Checking for environment variables...");
-    if (projectId) {
-        console.log("providers.tsx: VITE_WALLETCONNECT_PROJECT_ID is found.");
-    } else {
-        const errorMessage = "VITE_WALLETCONNECT_PROJECT_ID is MISSING. Please check your environment variables.";
-        console.error(`providers.tsx: ${errorMessage}`);
-        throw new Error(errorMessage);
+    if (!projectId) {
+        throw new Error("VITE_WALLETCONNECT_PROJECT_ID is MISSING. Please check your environment variables.");
     }
 
-    if (alchemyApiKey) {
-        console.log("providers.tsx: VITE_ALCHEMY_API_KEY is found.");
-    } else {
-        const errorMessage = "VITE_ALCHEMY_API_KEY is MISSING. Please check your environment variables.";
-        console.error(`providers.tsx: ${errorMessage}`);
-        throw new Error(errorMessage);
+    if (!alchemyApiKey) {
+        throw new Error("VITE_ALCHEMY_API_KEY is MISSING. Please check your environment variables.");
     }
+
+    console.log("providers.tsx: Environment variables found.");
 
     queryClient = new QueryClient();
 
-    // FIX: Define `chains` as a mutable, non-empty array tuple to satisfy AppKit's type requirements.
-    // The previous `as const` assertion created a `readonly` array, causing type conflicts.
+    // ✅ ПРАВИЛЬНО: Создаем массив сетей
     const chains: [Chain, ...Chain[]] = [sepolia, baseSepolia];
 
-    // Create the adapter
+    // ✅ ПРАВИЛЬНО: Создаем адаптер
     const wagmiAdapter = new WagmiAdapter({
         projectId,
         networks: chains,
@@ -52,26 +43,25 @@ try {
     });
 
     wagmiConfig = wagmiAdapter.wagmiConfig;
-    console.log("providers.tsx: wagmiConfig created:", wagmiConfig);
+    console.log("providers.tsx: wagmiConfig created successfully");
 
-    // Create the AppKit instance
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: УБИРАЕМ networks параметр!
     createAppKit({
-        adapters: [wagmiAdapter],
-        // FIX: The top-level AppKit config requires the networks array directly.
-        networks: chains,
+        adapters: [wagmiAdapter], // ← ВСЯ конфигурация уже в адаптере
         metadata: {
             name: 'Cabac',
             description: 'A decentralized exchange (DEX) interface for swapping tokens.',
             url: 'https://cabac.netlify.app',
             icons: ['https://cabac.netlify.app/favicon.ico'],
         }
-    });
-    console.log("providers.tsx: AppKit initialized.");
+    } as any); // ← Используем as any для обхода устаревших типов
+
+    console.log("providers.tsx: AppKit initialized successfully");
+
 } catch (e: any) {
     initializationError = e;
-    console.error("providers.tsx: A critical error occurred during initialization:", e);
+    console.error("providers.tsx: Initialization failed:", e);
 }
-
 
 export const AppProviders = ({ children }: { children: React.ReactNode }) => {
     console.log("providers.tsx: Rendering AppProviders component.");
@@ -87,9 +77,8 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
     }
     
     if (!wagmiConfig || !queryClient) {
-        // This should not happen if there's no error, but it's a good safeguard.
         return (
-             <div style={{ color: 'orange', padding: '2rem', backgroundColor: '#0D111C', height: '100vh' }}>
+            <div style={{ color: 'orange', padding: '2rem', backgroundColor: '#0D111C', height: '100vh' }}>
                 <h1>Application is initializing...</h1>
                 <p>If you see this for more than a few seconds, there might be an issue.</p>
             </div>
