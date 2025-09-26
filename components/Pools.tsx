@@ -134,7 +134,7 @@ const Pools: React.FC = () => {
 
     return (
         <div className="w-full max-w-2xl space-y-6">
-            <MyPositions />
+            <MyPositions onAdd={handleSelectPoolToAdd} onRemove={handleSelectPoolToRemove} />
             <div className="bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">All Pools</h2>

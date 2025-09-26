@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount, usePublicClient } from 'wagmi';
 import { formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
-import { TOKENS_BY_CHAIN } from '../constants';
-import { Token } from '../types';
+import { POOLS_BY_CHAIN, TOKENS_BY_CHAIN } from '../constants';
+import { Token, Pool } from '../types';
 
 interface Position {
     id: bigint;
@@ -11,9 +11,15 @@ interface Position {
     token1: Token;
     fee: number;
     liquidity: bigint;
+    pool: Pool;
 }
 
-const MyPositions: React.FC = () => {
+interface MyPositionsProps {
+    onAdd: (pool: Pool) => void;
+    onRemove: (pool: Pool) => void;
+}
+
+const MyPositions: React.FC<MyPositionsProps> = ({ onAdd, onRemove }) => {
     const { address, isConnected, chain } = useAccount();
     const publicClient = usePublicClient();
     const [positions, setPositions] = useState<Position[]>([]);
@@ -27,6 +33,20 @@ const MyPositions: React.FC = () => {
             });
         }
         return tokenMap;
+    }, [chain]);
+
+    const poolLookup = useMemo(() => {
+        const map = new Map<string, Pool>();
+        if (chain) {
+            const pools = POOLS_BY_CHAIN[chain.id] || [];
+            pools.forEach(pool => {
+                // Sort addresses to create a consistent key
+                const [addr0, addr1] = [pool.token0.address.toLowerCase(), pool.token1.address.toLowerCase()].sort();
+                const key = `${addr0}-${addr1}-${pool.fee}`;
+                map.set(key, pool);
+            });
+        }
+        return map;
     }, [chain]);
 
     useEffect(() => {
@@ -87,11 +107,19 @@ const MyPositions: React.FC = () => {
                     .filter(item => item.result)
                     .map(item => {
                         const posData = item.result as any; // Result from `positions` call
-                        const token0 = tokensForChain.get(posData[2].toLowerCase());
-                        const token1 = tokensForChain.get(posData[3].toLowerCase());
+                        const token0Addr = (posData[2] as string).toLowerCase();
+                        const token1Addr = (posData[3] as string).toLowerCase();
+                        const fee = posData[4];
 
-                        if (!token0 || !token1) {
-                            console.warn("MyPositions: Could not find token definitions for position", item.tokenId.toString(), "with token addresses", posData[2], posData[3]);
+                        const token0 = tokensForChain.get(token0Addr);
+                        const token1 = tokensForChain.get(token1Addr);
+                        
+                        const [sortedAddr0, sortedAddr1] = [token0Addr, token1Addr].sort();
+                        const poolKey = `${sortedAddr0}-${sortedAddr1}-${fee}`;
+                        const pool = poolLookup.get(poolKey);
+
+                        if (!token0 || !token1 || !pool) {
+                            console.warn("MyPositions: Could not find token/pool definitions for position", item.tokenId.toString(), "with token addresses", posData[2], posData[3]);
                             return null;
                         };
 
@@ -99,8 +127,9 @@ const MyPositions: React.FC = () => {
                             id: item.tokenId,
                             token0,
                             token1,
-                            fee: posData[4],
+                            fee,
                             liquidity: posData[7],
+                            pool,
                         };
                     })
                     .filter((p): p is Position => p !== null);
@@ -118,9 +147,9 @@ const MyPositions: React.FC = () => {
         };
 
         fetchPositions();
-    }, [address, chain, isConnected, publicClient, tokensForChain]);
+    }, [address, chain, isConnected, publicClient, tokensForChain, poolLookup]);
 
-    if (!isConnected || positions.length === 0 && !isLoading) {
+    if (!isConnected || (positions.length === 0 && !isLoading)) {
         return null;
     }
 
@@ -143,8 +172,22 @@ const MyPositions: React.FC = () => {
                                     <p className="text-xs text-brand-text-secondary">Fee: {pos.fee / 10000}%</p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
+                            <div className="flex items-center space-x-2">
+                                <div className="text-right mr-2">
+                                    <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
+                                </div>
+                                <button
+                                    onClick={() => onAdd(pos.pool)}
+                                    className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
+                                >
+                                    Add
+                                </button>
+                                <button
+                                    onClick={() => onRemove(pos.pool)}
+                                    className="bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
+                                >
+                                    Remove
+                                </button>
                             </div>
                         </div>
                     ))}
