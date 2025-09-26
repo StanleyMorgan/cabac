@@ -16,7 +16,7 @@ export interface Position {
 
 interface MyPositionsProps {
     onIncrease: (position: Position) => void;
-    onRemove: (pool: Pool) => void;
+    onRemove: (position: Position) => void;
 }
 
 const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
@@ -183,7 +183,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                     Add
                                 </button>
                                 <button
-                                    onClick={() => onRemove(pos.pool)}
+                                    onClick={() => onRemove(pos)}
                                     className="bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
                                 >
                                     Remove

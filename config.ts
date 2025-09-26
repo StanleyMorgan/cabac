@@ -173,6 +173,56 @@ export const POSITION_MANAGER_ABI = [
         "type": "function"
     },
     {
+        "inputs": [
+            {
+                "components": [
+                    { "type": "uint256", "name": "tokenId" },
+                    { "type": "uint128", "name": "liquidity" },
+                    { "type": "uint256", "name": "amount0Min" },
+                    { "type": "uint256", "name": "amount1Min" },
+                    { "type": "uint256", "name": "deadline" }
+                ],
+                "name": "params",
+                "type": "tuple"
+            }
+        ],
+        "name": "decreaseLiquidity",
+        "outputs": [
+            { "type": "uint256", "name": "amount0" },
+            { "type": "uint256", "name": "amount1" }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    { "type": "uint256", "name": "tokenId" },
+                    { "type": "address", "name": "recipient" },
+                    { "type": "uint128", "name": "amount0Max" },
+                    { "type": "uint128", "name": "amount1Max" }
+                ],
+                "name": "params",
+                "type": "tuple"
+            }
+        ],
+        "name": "collect",
+        "outputs": [
+            { "type": "uint256", "name": "amount0" },
+            { "type": "uint256", "name": "amount1" }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "type": "uint256", "name": "tokenId" }],
+        "name": "burn",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
         "inputs": [{ "type": "address", "name": "owner" }],
         "name": "balanceOf",
         "outputs": [{ "type": "uint256", "name": "" }],

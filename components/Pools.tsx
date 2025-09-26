@@ -121,8 +121,8 @@ const Pools: React.FC = () => {
         setView('increase');
     };
 
-    const handleSelectPoolToRemove = (pool: Pool) => {
-        setSelectedPool(pool);
+    const handleSelectPositionToRemove = (position: Position) => {
+        setSelectedPosition(position);
         setView('remove');
     };
 
@@ -140,13 +140,13 @@ const Pools: React.FC = () => {
         return <IncreaseLiquidityCard position={selectedPosition} onBack={handleBack} />;
     }
     
-    if (view === 'remove' && selectedPool) {
-        return <RemoveLiquidityCard pool={selectedPool} onBack={handleBack} />;
+    if (view === 'remove' && selectedPosition) {
+        return <RemoveLiquidityCard position={selectedPosition} onBack={handleBack} />;
     }
 
     return (
         <div className="w-full max-w-2xl space-y-6">
-            <MyPositions onIncrease={handleSelectPositionToIncrease} onRemove={handleSelectPoolToRemove} />
+            <MyPositions onIncrease={handleSelectPositionToIncrease} onRemove={handleSelectPositionToRemove} />
             <div className="bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">All Pools</h2>
@@ -188,7 +188,7 @@ const Pools: React.FC = () => {
                                             key={pool.address} 
                                             pool={pool} 
                                             onAdd={() => handleSelectPoolToAdd(pool)} 
-                                            onRemove={() => handleSelectPoolToRemove(pool)}
+                                            onRemove={() => {}}
                                         />
                                     ))
                                 )}
