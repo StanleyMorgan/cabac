@@ -45,9 +45,12 @@ try {
     wagmiConfig = wagmiAdapter.wagmiConfig;
     console.log("providers.tsx: wagmiConfig created successfully");
 
-    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: УБИРАЕМ networks параметр!
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Возвращаем параметр `networks`!
+    // AppKit ожидает список сетей напрямую, даже если он уже есть в адаптере.
+    // Это решает ошибку "Cannot read properties of undefined (reading 'map')".
     createAppKit({
-        adapters: [wagmiAdapter], // ← ВСЯ конфигурация уже в адаптере
+        networks: chains,
+        adapters: [wagmiAdapter], 
         metadata: {
             name: 'Cabac',
             description: 'A decentralized exchange (DEX) interface for swapping tokens.',
