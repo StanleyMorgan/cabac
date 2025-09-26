@@ -26,7 +26,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
     const [positions, setPositions] = useState<Position[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [hideEmpty, setHideEmpty] = useState(true);
+    const [showEmpty, setShowEmpty] = useState(false);
     const [burningPositionId, setBurningPositionId] = useState<bigint | null>(null);
     const [refetchCounter, setRefetchCounter] = useState(0);
 
@@ -161,9 +161,11 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
     };
     
     const filteredPositions = useMemo(() => {
-        if (!hideEmpty) return positions;
+        if (showEmpty) {
+            return positions;
+        }
         return positions.filter(p => p.liquidity > 0n);
-    }, [positions, hideEmpty]);
+    }, [positions, showEmpty]);
 
 
     if (!isConnected || (positions.length === 0 && !isLoading)) {
@@ -175,15 +177,18 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">My Positions</h2>
                 <div className="flex items-center space-x-2">
-                    <input 
-                        type="checkbox" 
-                        id="hide-empty" 
-                        checked={hideEmpty} 
-                        onChange={() => setHideEmpty(!hideEmpty)}
-                        className="h-4 w-4 rounded bg-brand-surface-2 border-brand-secondary text-brand-primary focus:ring-brand-primary focus:ring-2 focus:ring-offset-2 focus:ring-offset-brand-surface"
-                    />
-                    <label htmlFor="hide-empty" className="text-sm text-brand-text-secondary select-none">
-                        Hide empty positions
+                    <label htmlFor="show-empty" className="text-sm text-brand-text-secondary select-none">
+                        Empty
+                    </label>
+                     <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                            type="checkbox"
+                            id="show-empty"
+                            checked={showEmpty}
+                            onChange={() => setShowEmpty(!showEmpty)}
+                            className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-brand-secondary rounded-full peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-offset-brand-surface peer-focus:ring-brand-primary peer-checked:bg-brand-primary after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:ease-in-out after:duration-200 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                     </label>
                 </div>
             </div>
@@ -234,7 +239,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                             </div>
                         </div>
                     ))}
-                    {filteredPositions.length === 0 && hideEmpty &&
+                    {filteredPositions.length === 0 && !showEmpty &&
                         <div className="text-center text-brand-text-secondary py-8">You have no active liquidity positions.</div>
                     }
                  </div>
