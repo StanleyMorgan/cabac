@@ -16,7 +16,7 @@ const RemoveLiquidityCard: React.FC<RemoveLiquidityCardProps> = ({ position, onB
     const { data: walletClient } = useWalletClient();
 
     const [percentage, setPercentage] = useState(50);
-    const [status, setStatus] = useState<'idle' | 'removing' | 'collecting' | 'burning'>('idle');
+    const [status, setStatus] = useState<'idle' | 'removing' | 'collecting'>('idle');
     const [error, setError] = useState<string | null>(null);
 
     const handleRemoveLiquidity = async () => {
@@ -67,20 +67,6 @@ const RemoveLiquidityCard: React.FC<RemoveLiquidityCardProps> = ({ position, onB
             });
             await publicClient.waitForTransactionReceipt({ hash: collectTx });
 
-            // 3. Burn NFT if 100% liquidity is removed
-            if (percentage === 100) {
-                setStatus('burning');
-                const burnTx = await walletClient.writeContract({
-                    address: positionManagerAddress,
-                    abi: POSITION_MANAGER_ABI,
-                    functionName: 'burn',
-                    args: [position.id],
-                    chain,
-                    account: address,
-                });
-                await publicClient.waitForTransactionReceipt({ hash: burnTx });
-            }
-
             setStatus('idle');
             onBack();
 
@@ -98,7 +84,6 @@ const RemoveLiquidityCard: React.FC<RemoveLiquidityCardProps> = ({ position, onB
         switch (status) {
             case 'removing': return "Decreasing Liquidity...";
             case 'collecting': return "Collecting Tokens...";
-            case 'burning': return "Burning NFT...";
             default: return "Remove Liquidity";
         }
     };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
 import { POOLS_BY_CHAIN, TOKENS_BY_CHAIN } from '../constants';
@@ -22,8 +22,13 @@ interface MyPositionsProps {
 const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
     const { address, isConnected, chain } = useAccount();
     const publicClient = usePublicClient();
+    const { data: walletClient } = useWalletClient();
+
     const [positions, setPositions] = useState<Position[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [hideEmpty, setHideEmpty] = useState(true);
+    const [burningPositionId, setBurningPositionId] = useState<bigint | null>(null);
+    const [refetchCounter, setRefetchCounter] = useState(0);
 
     const tokensForChain = useMemo(() => {
         const tokenMap = new Map<string, Token>();
@@ -40,7 +45,6 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
         if (chain) {
             const pools = POOLS_BY_CHAIN[chain.id] || [];
             pools.forEach(pool => {
-                // Sort addresses to create a consistent key
                 const [addr0, addr1] = [pool.token0.address.toLowerCase(), pool.token1.address.toLowerCase()].sort();
                 const key = `${addr0}-${addr1}-${pool.fee}`;
                 map.set(key, pool);
@@ -55,26 +59,20 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                 setPositions([]);
                 return;
             };
-
-            console.log("MyPositions: Starting to fetch positions for address:", address, "on chain:", chain.id);
+            
             setIsLoading(true);
             try {
                 const positionManagerAddress = CONTRACT_ADDRESSES[chain.id].POSITION_MANAGER;
-                console.log("MyPositions: Using Position Manager address:", positionManagerAddress);
-
-                // FIX: Cast to any to work around a deep type instantiation issue in viem.
+                
                 const balance = await publicClient.readContract({
                     address: positionManagerAddress,
                     abi: POSITION_MANAGER_ABI,
                     functionName: 'balanceOf',
                     args: [address],
                 } as any);
-                console.log("MyPositions: NFT balance (position count):", balance.toString());
-
 
                 if (balance === BigInt(0)) {
                     setPositions([]);
-                    console.log("MyPositions: No positions found. Halting fetch.");
                     return;
                 }
 
@@ -85,10 +83,8 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     args: [address, BigInt(i)],
                 }));
 
-                console.log("MyPositions: Fetching token IDs...");
                 const tokenIdsResults = await publicClient.multicall({ contracts: tokenIdsCalls } as any);
                 const tokenIds = tokenIdsResults.filter(r => r.status === 'success').map(r => r.result as bigint);
-                console.log("MyPositions: Fetched Token IDs:", tokenIds.map(id => id.toString()));
 
                 const positionsCalls = tokenIds.map(tokenId => ({
                     address: positionManagerAddress,
@@ -97,16 +93,13 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     args: [tokenId],
                 }));
                 
-                console.log("MyPositions: Fetching position details for", tokenIds.length, "tokens...");
                 const positionsResults = await publicClient.multicall({ contracts: positionsCalls } as any);
-                console.log("MyPositions: Position details results raw:", positionsResults);
-
 
                 const fetchedPositions: Position[] = positionsResults
                     .map((r, i) => ({ result: r.result, tokenId: tokenIds[i] }))
                     .filter(item => item.result)
                     .map(item => {
-                        const posData = item.result as any; // Result from `positions` call
+                        const posData = item.result as any;
                         const token0Addr = (posData[2] as string).toLowerCase();
                         const token1Addr = (posData[3] as string).toLowerCase();
                         const fee = posData[4];
@@ -118,10 +111,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                         const poolKey = `${sortedAddr0}-${sortedAddr1}-${fee}`;
                         const pool = poolLookup.get(poolKey);
 
-                        if (!token0 || !token1 || !pool) {
-                            console.warn("MyPositions: Could not find token/pool definitions for position", item.tokenId.toString(), "with token addresses", posData[2], posData[3]);
-                            return null;
-                        };
+                        if (!token0 || !token1 || !pool) return null;
 
                         return {
                             id: item.tokenId,
@@ -134,7 +124,6 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     })
                     .filter((p): p is Position => p !== null);
                 
-                console.log("MyPositions: Final parsed positions:", fetchedPositions);
                 setPositions(fetchedPositions);
 
             } catch (error) {
@@ -142,12 +131,40 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                 setPositions([]);
             } finally {
                 setIsLoading(false);
-                console.log("MyPositions: Fetching complete.");
             }
         };
 
         fetchPositions();
-    }, [address, chain, isConnected, publicClient, tokensForChain, poolLookup]);
+    }, [address, chain, isConnected, publicClient, tokensForChain, poolLookup, refetchCounter]);
+
+    const handleBurn = async (tokenId: bigint) => {
+        if (!walletClient || !address || !chain) return;
+
+        setBurningPositionId(tokenId);
+        try {
+            const positionManagerAddress = CONTRACT_ADDRESSES[chain.id].POSITION_MANAGER;
+            const burnTx = await walletClient.writeContract({
+                address: positionManagerAddress,
+                abi: POSITION_MANAGER_ABI,
+                functionName: 'burn',
+                args: [tokenId],
+                chain,
+                account: address,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: burnTx });
+            setRefetchCounter(c => c + 1);
+        } catch (error) {
+            console.error("Failed to burn NFT:", error);
+        } finally {
+            setBurningPositionId(null);
+        }
+    };
+    
+    const filteredPositions = useMemo(() => {
+        if (!hideEmpty) return positions;
+        return positions.filter(p => p.liquidity > 0n);
+    }, [positions, hideEmpty]);
+
 
     if (!isConnected || (positions.length === 0 && !isLoading)) {
         return null;
@@ -155,12 +172,26 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
     return (
         <div className="w-full max-w-2xl bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
-            <h2 className="text-xl font-bold mb-4">My Positions</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">My Positions</h2>
+                <div className="flex items-center space-x-2">
+                    <input 
+                        type="checkbox" 
+                        id="hide-empty" 
+                        checked={hideEmpty} 
+                        onChange={() => setHideEmpty(!hideEmpty)}
+                        className="h-4 w-4 rounded bg-brand-surface-2 border-brand-secondary text-brand-primary focus:ring-brand-primary focus:ring-2 focus:ring-offset-2 focus:ring-offset-brand-surface"
+                    />
+                    <label htmlFor="hide-empty" className="text-sm text-brand-text-secondary select-none">
+                        Hide empty positions
+                    </label>
+                </div>
+            </div>
             {isLoading ? (
                 <div className="text-center text-brand-text-secondary py-8">Loading your positions...</div>
             ) : positions.length > 0 ? (
                  <div className="space-y-3">
-                    {positions.map(pos => (
+                    {filteredPositions.map(pos => (
                         <div key={pos.id.toString()} className="bg-brand-surface-2 p-4 rounded-xl flex justify-between items-center">
                             <div className="flex items-center">
                                 <div className="flex -space-x-2 mr-3">
@@ -173,24 +204,39 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <div className="text-right mr-2">
-                                    <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
-                                </div>
-                                <button
-                                    onClick={() => onIncrease(pos)}
-                                    className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
-                                >
-                                    Add
-                                </button>
-                                <button
-                                    onClick={() => onRemove(pos)}
-                                    className="bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
-                                >
-                                    Remove
-                                </button>
+                                {pos.liquidity > 0n ? (
+                                     <>
+                                        <div className="text-right mr-2">
+                                            <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
+                                        </div>
+                                        <button
+                                            onClick={() => onRemove(pos)}
+                                            className="bg-brand-secondary hover:bg-gray-700 text-brand-text-primary font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
+                                        >
+                                            Remove
+                                        </button>
+                                        <button
+                                            onClick={() => onIncrease(pos)}
+                                            className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
+                                        >
+                                            Add
+                                        </button>
+                                     </>
+                                ) : (
+                                    <button
+                                        onClick={() => handleBurn(pos.id)}
+                                        disabled={burningPositionId === pos.id}
+                                        className="bg-brand-accent hover:opacity-90 text-white font-semibold py-1 px-3 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                    >
+                                        {burningPositionId === pos.id ? 'Burning...' : 'Burn'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
+                    {filteredPositions.length === 0 && hideEmpty &&
+                        <div className="text-center text-brand-text-secondary py-8">You have no active liquidity positions.</div>
+                    }
                  </div>
             ) : (
                 <div className="text-center text-brand-text-secondary py-8">You have no liquidity positions on this network.</div>
