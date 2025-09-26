@@ -7,8 +7,9 @@ import { Pool } from '../types';
 import { PoolTableRow } from './PoolTableRow';
 import AddLiquidityCard from './AddLiquidityCard';
 import RemoveLiquidityCard from './RemoveLiquidityCard';
+import IncreaseLiquidityCard from './IncreaseLiquidityCard';
 import { RefreshIcon } from './icons/RefreshIcon';
-import MyPositions from './MyPositions';
+import MyPositions, { type Position } from './MyPositions';
 
 const minimalBalanceOfAbi = [
     {
@@ -106,12 +107,18 @@ const Pools: React.FC = () => {
         });
     }, [basePools, balanceResults]);
 
-    const [view, setView] = useState<'list' | 'add' | 'remove'>('list');
+    const [view, setView] = useState<'list' | 'add' | 'remove' | 'increase'>('list');
     const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+    const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
     const handleSelectPoolToAdd = (pool: Pool) => {
         setSelectedPool(pool);
         setView('add');
+    };
+
+    const handleSelectPositionToIncrease = (position: Position) => {
+        setSelectedPosition(position);
+        setView('increase');
     };
 
     const handleSelectPoolToRemove = (pool: Pool) => {
@@ -121,11 +128,16 @@ const Pools: React.FC = () => {
 
     const handleBack = () => {
         setSelectedPool(null);
+        setSelectedPosition(null);
         setView('list');
     };
     
     if (view === 'add' && selectedPool) {
         return <AddLiquidityCard pool={selectedPool} onBack={handleBack} />;
+    }
+
+    if (view === 'increase' && selectedPosition) {
+        return <IncreaseLiquidityCard position={selectedPosition} onBack={handleBack} />;
     }
     
     if (view === 'remove' && selectedPool) {
@@ -134,7 +146,7 @@ const Pools: React.FC = () => {
 
     return (
         <div className="w-full max-w-2xl space-y-6">
-            <MyPositions onAdd={handleSelectPoolToAdd} onRemove={handleSelectPoolToRemove} />
+            <MyPositions onIncrease={handleSelectPositionToIncrease} onRemove={handleSelectPoolToRemove} />
             <div className="bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">All Pools</h2>

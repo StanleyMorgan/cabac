@@ -149,6 +149,30 @@ export const POSITION_MANAGER_ABI = [
         "type": "function"
     },
     {
+        "inputs": [
+            {
+                "components": [
+                    { "type": "uint256", "name": "tokenId" },
+                    { "type": "uint256", "name": "amount0Desired" },
+                    { "type": "uint256", "name": "amount1Desired" },
+                    { "type": "uint256", "name": "amount0Min" },
+                    { "type": "uint256", "name": "amount1Min" },
+                    { "type": "uint256", "name": "deadline" }
+                ],
+                "name": "params",
+                "type": "tuple"
+            }
+        ],
+        "name": "increaseLiquidity",
+        "outputs": [
+            { "type": "uint128", "name": "liquidity" },
+            { "type": "uint256", "name": "amount0" },
+            { "type": "uint256", "name": "amount1" }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
         "inputs": [{ "type": "address", "name": "owner" }],
         "name": "balanceOf",
         "outputs": [{ "type": "uint256", "name": "" }],

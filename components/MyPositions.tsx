@@ -5,7 +5,7 @@ import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
 import { POOLS_BY_CHAIN, TOKENS_BY_CHAIN } from '../constants';
 import { Token, Pool } from '../types';
 
-interface Position {
+export interface Position {
     id: bigint;
     token0: Token;
     token1: Token;
@@ -15,11 +15,11 @@ interface Position {
 }
 
 interface MyPositionsProps {
-    onAdd: (pool: Pool) => void;
+    onIncrease: (position: Position) => void;
     onRemove: (pool: Pool) => void;
 }
 
-const MyPositions: React.FC<MyPositionsProps> = ({ onAdd, onRemove }) => {
+const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
     const { address, isConnected, chain } = useAccount();
     const publicClient = usePublicClient();
     const [positions, setPositions] = useState<Position[]>([]);
@@ -177,7 +177,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onAdd, onRemove }) => {
                                     <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
                                 </div>
                                 <button
-                                    onClick={() => onAdd(pos.pool)}
+                                    onClick={() => onIncrease(pos)}
                                     className="bg-brand-primary hover:bg-brand-primary-hover text-white font-semibold py-1 px-3 rounded-lg text-sm transition-colors"
                                 >
                                     Add
