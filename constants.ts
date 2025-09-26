@@ -100,7 +100,7 @@ const USDT_CELO_SEPOLIA: Token = {
 };
 
 const USDC_CELO_SEPOLIA: Token = {
-    address: '0x0Af7c4A52b5C2cc18E8C3b707d40dF561d5D6B',
+    address: '0x0Af7c4A52b5C2cc18E8C3b707d40dF561d5D8D6B',
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
