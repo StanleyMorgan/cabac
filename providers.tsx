@@ -39,7 +39,7 @@ try {
         transports: {
             [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
             [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
-            [celoSepolia.id]: http('https://sepolia-forno.celo-testnet.org'),
+            [celoSepolia.id]: http(`https://celo-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
         }
     });
 
