@@ -1,5 +1,5 @@
 import type { Token, Pool } from './types';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 
 // A commonly used placeholder for native currency
 export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
@@ -21,6 +21,15 @@ const ETH_BASE_SEPOLIA: Token = {
     decimals: 18,
 };
 
+// This represents the native gas token for Celo, but it's not used for swapping directly.
+// const CELO_CELO_SEPOLIA: Token = {
+//     address: NATIVE_TOKEN_ADDRESS,
+//     symbol: 'CELO',
+//     name: 'Celo',
+//     logoURI: 'https://assets.coingecko.com/coins/images/8672/small/Celo_Gold.png',
+//     decimals: 18,
+// };
+
 // --- Sepolia Tokens ---
 const WETH_SEPOLIA: Token = {
     address: '0x7b79995e5f793A07Bc00c21412e50Eaae098E7f9',
@@ -35,7 +44,7 @@ const USDC_SEPOLIA: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-    decimals: 6,
+    decimals: 18,
 };
 
 
@@ -72,6 +81,40 @@ const USDE_BASE_SEPOLIA: Token = {
     decimals: 18,
 };
 
+// --- Celo Sepolia Tokens ---
+// In Celo, the native asset is often used in its ERC-20 form (like WETH) but referred to as just CELO.
+const CELO_ON_CELO_SEPOLIA: Token = {
+    address: '0x471EcE3750Da237f93B8E339c536989b8978a438',
+    symbol: 'CELO', // Not WCELO for better UX
+    name: 'Celo', // Not "Wrapped Celo"
+    logoURI: 'https://assets.coingecko.com/coins/images/8672/small/Celo_Gold.png',
+    decimals: 18,
+};
+
+const USDT_CELO_SEPOLIA: Token = {
+    address: '0xF103317F558778260C428037881aDcdfE999BD4E',
+    symbol: 'USDT',
+    name: 'Tether USD',
+    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    decimals: 18,
+};
+
+const USDC_CELO_SEPOLIA: Token = {
+    address: '0x0Af7c4A52b5C2cc18E8C3b707d40dF561d5D6B',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    decimals: 18,
+};
+
+const USDE_CELO_SEPOLIA: Token = {
+    address: '0x2c0199ff278FE8c9e784828B7CE19158A68Ce7B9',
+    symbol: 'USDe',
+    name: 'Ethena USDe',
+    logoURI: 'https://assets.coingecko.com/coins/images/33613/small/usde.png',
+    decimals: 18,
+};
+
 
 export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
     [sepolia.id]: [
@@ -85,6 +128,12 @@ export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
         USDC_BASE_SEPOLIA,
         USDT_BASE_SEPOLIA,
         USDE_BASE_SEPOLIA,
+    ],
+    [celoSepolia.id]: [
+        CELO_ON_CELO_SEPOLIA, // The ERC-20 version is the one used for swaps.
+        USDC_CELO_SEPOLIA,
+        USDT_CELO_SEPOLIA,
+        USDE_CELO_SEPOLIA,
     ]
 };
 
@@ -115,6 +164,24 @@ const POOL_USDE_USDT_BASE_SEPOLIA: Pool = {
     myLiquidity: 0,
 };
 
+const POOL_USDC_USDT_CELO_SEPOLIA: Pool = {
+    address: '0x1B9A6e6b26A83F9938Bb5e22bF494648C14950c8',
+    // token0 must be the token with the smaller address
+    token0: USDC_CELO_SEPOLIA, // 0x0Af...
+    token1: USDT_CELO_SEPOLIA, // 0xF10...
+    fee: 3000,
+    myLiquidity: 0,
+};
+
+const POOL_USDE_USDT_CELO_SEPOLIA: Pool = {
+    address: '0x37428a1dbC5980776407c264a80a818e44b2B166',
+    // token0 must be the token with the smaller address
+    token0: USDE_CELO_SEPOLIA, // 0x2c0...
+    token1: USDT_CELO_SEPOLIA, // 0xF10...
+    fee: 3000,
+    myLiquidity: 0,
+};
+
 
 export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
     [sepolia.id]: [
@@ -123,5 +190,9 @@ export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
     [baseSepolia.id]: [
         POOL_USDC_USDT_BASE_SEPOLIA,
         POOL_USDE_USDT_BASE_SEPOLIA,
+    ],
+    [celoSepolia.id]: [
+        POOL_USDC_USDT_CELO_SEPOLIA,
+        POOL_USDE_USDT_CELO_SEPOLIA,
     ]
 };

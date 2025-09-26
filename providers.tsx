@@ -1,6 +1,6 @@
 import React from 'react';
 import { WagmiProvider, http, type Config } from 'wagmi';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 import { type Chain } from 'viem';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createAppKit } from '@reown/appkit/react';
@@ -30,7 +30,7 @@ try {
     queryClient = new QueryClient();
 
     // ✅ ПРАВИЛЬНО: Создаем массив сетей
-    const chains: [Chain, ...Chain[]] = [sepolia, baseSepolia];
+    const chains: [Chain, ...Chain[]] = [sepolia, baseSepolia, celoSepolia];
 
     // ✅ ПРАВИЛЬНО: Создаем адаптер
     const wagmiAdapter = new WagmiAdapter({
@@ -39,6 +39,7 @@ try {
         transports: {
             [sepolia.id]: http(`https://eth-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
             [baseSepolia.id]: http(`https://base-sepolia.g.alchemy.com/v2/${alchemyApiKey}`),
+            [celoSepolia.id]: http('https://sepolia-forno.celo-testnet.org'),
         }
     });
 
