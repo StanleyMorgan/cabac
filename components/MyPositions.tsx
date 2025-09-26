@@ -124,6 +124,20 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     })
                     .filter((p): p is Position => p !== null);
                 
+                fetchedPositions.sort((a, b) => {
+                    const aIsEmpty = a.liquidity === 0n;
+                    const bIsEmpty = b.liquidity === 0n;
+
+                    if (aIsEmpty && !bIsEmpty) {
+                        return 1; // a (empty) goes after b (not empty)
+                    }
+                    if (!aIsEmpty && bIsEmpty) {
+                        return -1; // a (not empty) goes before b (empty)
+                    }
+                    // For positions of the same type, sort by newest first
+                    return Number(b.id - a.id);
+                });
+                
                 setPositions(fetchedPositions);
 
             } catch (error) {
