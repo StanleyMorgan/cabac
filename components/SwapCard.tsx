@@ -62,9 +62,27 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, []);
 
     useEffect(() => {
-        if (tokens.length > 1 && (!tokenIn.address || !tokenOut.address)) {
-            setTokenIn(tokens[0]);
-            setTokenOut(tokens[1]);
+        // This effect ensures that when the network (and thus the available `tokens`) changes,
+        // the selected tokens are reset to valid defaults for the new network.
+        const tokenInIsValid = tokens.some(t => t.address.toLowerCase() === tokenIn?.address?.toLowerCase());
+        const tokenOutIsValid = tokens.some(t => t.address.toLowerCase() === tokenOut?.address?.toLowerCase());
+    
+        // If either of the selected tokens is not valid for the current chain, reset them.
+        if (!tokenInIsValid || !tokenOutIsValid) {
+            if (tokens.length > 1) {
+                setTokenIn(tokens[0]);
+                setTokenOut(tokens[1]);
+            } else if (tokens.length === 1) {
+                setTokenIn(tokens[0]);
+                setTokenOut({} as Token); // Use an empty object if there's no second token
+            } else {
+                setTokenIn({} as Token);
+                setTokenOut({} as Token);
+            }
+            // Also reset amounts and errors to prevent stale state.
+            setAmountIn('');
+            setAmountOut('');
+            setError(null);
         }
     }, [tokens, tokenIn, tokenOut]);
 
