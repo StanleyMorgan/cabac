@@ -1,4 +1,4 @@
-import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
+import { base, sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 
 // --- ABIs ---
 
@@ -292,6 +292,11 @@ export const CONTRACT_ADDRESSES: {
         WETH: `0x${string}`;
     }
 } = {
+    [base.id]: {
+        ROUTER: '0xe2649752dE1DEb3A7bC7Ad3e1CDcE9eb8535392d',
+        POSITION_MANAGER: '0x4415E20643a50cCa212a2243759F536A547E3AAE',
+        WETH: '0x4200000000000000000000000000000000000006',
+    },
     [sepolia.id]: {
         ROUTER: '0x3bFA4769FB09eefC5aB096D40Ea009372DE6A227',
         POSITION_MANAGER: '0x1238536071E1c577A68CF586AbD578b2B4182373',

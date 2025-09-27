@@ -1,10 +1,18 @@
 import type { Token, Pool } from './types';
-import { sepolia, baseSepolia, celoSepolia } from 'viem/chains';
+import { base, sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 
 // A commonly used placeholder for native currency
 export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // --- Native Tokens ---
+const ETH_BASE: Token = {
+    address: NATIVE_TOKEN_ADDRESS,
+    symbol: 'ETH',
+    name: 'Ether',
+    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+    decimals: 18,
+};
+
 const ETH_SEPOLIA: Token = {
     address: NATIVE_TOKEN_ADDRESS,
     symbol: 'ETH',
@@ -21,14 +29,39 @@ const ETH_BASE_SEPOLIA: Token = {
     decimals: 18,
 };
 
-// This represents the native gas token for Celo, but it's not used for swapping directly.
-// const CELO_CELO_SEPOLIA: Token = {
-//     address: NATIVE_TOKEN_ADDRESS,
-//     symbol: 'CELO',
-//     name: 'Celo',
-//     logoURI: 'https://assets.coingecko.com/coins/images/8672/small/Celo_Gold.png',
-//     decimals: 18,
-// };
+// --- Base Mainnet Tokens ---
+const WETH_BASE: Token = {
+    address: '0x4200000000000000000000000000000000000006',
+    symbol: 'WETH',
+    name: 'Wrapped Ether',
+    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+    decimals: 18,
+};
+
+const USDC_BASE: Token = {
+    address: '0xbCe7BA2d640e56D46E0D57887E5Cd7111ABacC75',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    decimals: 6,
+};
+
+const USDT_BASE: Token = {
+    address: '0x3e7412a9b0742F6f98808F35Ceed1115a35d5092',
+    symbol: 'USDT',
+    name: 'Tether USD',
+    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    decimals: 6,
+};
+
+const USDE_BASE: Token = {
+    address: '0x81beeF0E0b601cDEc4DE52F642CCCf46c331cDB1',
+    symbol: 'USDe',
+    name: 'Ethena USDe',
+    logoURI: 'https://assets.coingecko.com/coins/images/33613/small/usde.png',
+    decimals: 18,
+};
+
 
 // --- Sepolia Tokens ---
 const WETH_SEPOLIA: Token = {
@@ -117,6 +150,13 @@ const USDE_CELO_SEPOLIA: Token = {
 
 
 export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
+    [base.id]: [
+        ETH_BASE,
+        WETH_BASE,
+        USDC_BASE,
+        USDT_BASE,
+        USDE_BASE,
+    ],
     [sepolia.id]: [
         ETH_SEPOLIA,
         WETH_SEPOLIA,
@@ -138,6 +178,26 @@ export const TOKENS_BY_CHAIN: { [chainId: number]: Token[] } = {
 };
 
 // --- Pools ---
+// --- Base Mainnet Pools ---
+const POOL_USDT_USDC_BASE: Pool = {
+    address: '0xf5a6e90ee54980d82353178673aD48a142eC9f86',
+    // token0 must be the token with the smaller address
+    token0: USDT_BASE, // 0x3e...
+    token1: USDC_BASE, // 0xbCe...
+    fee: 500, // 0.05% fee tier
+    myLiquidity: 0,
+};
+
+const POOL_USDT_USDE_BASE: Pool = {
+    address: '0x9d39C1F7251D0E874671E54dCA7D8c55f65a55Ce',
+    // token0 must be the token with the smaller address
+    token0: USDT_BASE, // 0x3e...
+    token1: USDE_BASE, // 0x81b...
+    fee: 500, // 0.05% fee tier
+    myLiquidity: 0,
+};
+
+
 const POOL_WETH_USDC_SEPOLIA: Pool = {
     address: '0x7a43793A32aF1550a43054135285786b4374352a', // Placeholder
     token0: WETH_SEPOLIA,
@@ -184,6 +244,10 @@ const POOL_USDE_USDT_CELO_SEPOLIA: Pool = {
 
 
 export const POOLS_BY_CHAIN: { [chainId: number]: Pool[] } = {
+    [base.id]: [
+        POOL_USDT_USDC_BASE,
+        POOL_USDT_USDE_BASE,
+    ],
     [sepolia.id]: [
         POOL_WETH_USDC_SEPOLIA
     ],

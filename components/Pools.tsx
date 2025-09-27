@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAccount, usePublicClient } from 'wagmi';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { formatUnits } from 'viem';
 import { POOLS_BY_CHAIN } from '../constants';
 import { Pool } from '../types';
@@ -33,7 +33,7 @@ const Pools: React.FC = () => {
     const { isConnected, chain } = useAccount();
     const chainId = chain?.id;
     
-    const displayChainId = chainId || baseSepolia.id;
+    const displayChainId = chainId || base.id;
     
     const publicClient = usePublicClient({ chainId: displayChainId });
 

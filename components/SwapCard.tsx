@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount, useBalance, usePublicClient, useWalletClient } from 'wagmi';
 import { formatUnits, parseUnits } from 'viem';
-import { sepolia, baseSepolia } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import type { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
 import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI, WETH_ABI } from '../config';
@@ -25,7 +25,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const { data: walletClient } = useWalletClient();
     const { open: openWalletModal } = useAppKit();
 
-    const chainId = chain?.id ?? baseSepolia.id;
+    const chainId = chain?.id ?? base.id;
     const tokens = useMemo(() => TOKENS_BY_CHAIN[chainId] || [], [chainId]);
     const pools = useMemo(() => POOLS_BY_CHAIN[chainId] || [], [chainId]);
 
