@@ -43,7 +43,7 @@ const USDC_BASE: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-    decimals: 6,
+    decimals: 18,
 };
 
 const USDT_BASE: Token = {
@@ -51,7 +51,7 @@ const USDT_BASE: Token = {
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-    decimals: 6,
+    decimals: 18,
 };
 
 const USDE_BASE: Token = {
