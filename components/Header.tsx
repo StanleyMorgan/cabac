@@ -1,6 +1,7 @@
 
+
 import React from 'react';
-import { BeerMugIcon } from './icons/BeerMugIcon';
+import { LogoIcon } from './icons/LogoIcon';
 
 const Header: React.FC = () => {
   return (
@@ -8,7 +9,7 @@ const Header: React.FC = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-3">
-            <BeerMugIcon className="h-8 w-8 text-brand-primary" />
+            <LogoIcon className="h-8 w-8 text-brand-primary" />
             <span className="text-xl font-bold text-brand-text-primary">Cabac</span>
           </div>
           <appkit-button />
