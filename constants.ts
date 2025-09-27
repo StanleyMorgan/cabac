@@ -184,7 +184,7 @@ const POOL_USDT_USDC_BASE: Pool = {
     // token0 must be the token with the smaller address
     token0: USDT_BASE, // 0x3e...
     token1: USDC_BASE, // 0xbCe...
-    fee: 500, // 0.05% fee tier
+    fee: 3000, // 0.3% fee tier
     myLiquidity: 0,
 };
 
@@ -193,7 +193,7 @@ const POOL_USDT_USDE_BASE: Pool = {
     // token0 must be the token with the smaller address
     token0: USDT_BASE, // 0x3e...
     token1: USDE_BASE, // 0x81b...
-    fee: 500, // 0.05% fee tier
+    fee: 3000, // 0.3% fee tier
     myLiquidity: 0,
 };
 
