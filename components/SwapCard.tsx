@@ -4,7 +4,7 @@ import { formatUnits, parseUnits } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
 import type { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
-import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI } from '../config';
+import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI, WETH_ABI } from '../config';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAppKit } from '@reown/appkit/react';
 
@@ -57,6 +57,18 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         chainId: chainId,
     });
 
+    const isWrapping = useMemo(() => {
+        const wethAddress = CONTRACT_ADDRESSES[chainId]?.WETH;
+        if (!wethAddress || !tokenIn?.address || !tokenOut?.address) return false;
+        return tokenIn.address === NATIVE_TOKEN_ADDRESS && tokenOut.address.toLowerCase() === wethAddress.toLowerCase();
+    }, [tokenIn, tokenOut, chainId]);
+
+    const isUnwrapping = useMemo(() => {
+        const wethAddress = CONTRACT_ADDRESSES[chainId]?.WETH;
+        if (!wethAddress || !tokenIn?.address || !tokenOut?.address) return false;
+        return tokenIn.address.toLowerCase() === wethAddress.toLowerCase() && tokenOut.address === NATIVE_TOKEN_ADDRESS;
+    }, [tokenIn, tokenOut, chainId]);
+
     useEffect(() => {
         console.log("SwapCard.tsx: Component successfully mounted.");
     }, []);
@@ -88,6 +100,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     useEffect(() => {
         const getQuote = async () => {
+            if (isWrapping || isUnwrapping) {
+                setAmountOut(amountIn); // 1:1 ratio for wrap/unwrap
+                setError(null);
+                setIsQuoteLoading(false);
+                return;
+            }
+
             if (!publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address || !chain) {
                 setAmountOut('');
                 return;
@@ -147,7 +166,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
 
         getQuote();
-    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools]);
+    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping]);
 
     const handleTokenSelect = (token: Token) => {
         if (selectingFor === 'in') {
@@ -171,6 +190,66 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         setTokenOut(tokenIn);
         setAmountIn(amountOut);
         setAmountOut(amountIn);
+    };
+
+    const handleWrap = async () => {
+        if (!walletClient || !address || !chain || !amountIn) return;
+        setError(null);
+        setIsSwapping(true);
+        try {
+            const amountInParsed = parseUnits(amountIn, tokenIn.decimals);
+            const wethAddress = CONTRACT_ADDRESSES[chain.id].WETH;
+
+            const wrapTx = await walletClient.writeContract({
+                address: wethAddress,
+                abi: WETH_ABI,
+                functionName: 'deposit',
+                value: amountInParsed,
+                chain,
+                account: address,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: wrapTx });
+
+            refetchBalanceIn();
+            refetchBalanceOut();
+            setAmountIn('');
+            setAmountOut('');
+        } catch (err: any) {
+            console.error(err);
+            setError(err.shortMessage || "An error occurred during wrapping.");
+        } finally {
+            setIsSwapping(false);
+        }
+    };
+
+    const handleUnwrap = async () => {
+        if (!walletClient || !address || !chain || !amountIn) return;
+        setError(null);
+        setIsSwapping(true);
+        try {
+            const amountInParsed = parseUnits(amountIn, tokenIn.decimals);
+            const wethAddress = CONTRACT_ADDRESSES[chain.id].WETH;
+
+            const unwrapTx = await walletClient.writeContract({
+                address: wethAddress,
+                abi: WETH_ABI,
+                functionName: 'withdraw',
+                args: [amountInParsed],
+                chain,
+                account: address,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: unwrapTx });
+
+            refetchBalanceIn();
+            refetchBalanceOut();
+            setAmountIn('');
+            setAmountOut('');
+        } catch (err: any) {
+            console.error(err);
+            setError(err.shortMessage || "An error occurred during unwrapping.");
+        } finally {
+            setIsSwapping(false);
+        }
     };
 
     const handleSwap = async () => {
@@ -267,35 +346,51 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     const isButtonDisabled = isWalletConnected && (
         !amountIn || 
-        !amountOut ||
         isQuoteLoading ||
         isApproving || 
         isSwapping || 
-        parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')
+        parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0') ||
+        (!(isWrapping || isUnwrapping) && !amountOut)
     );
 
     const buttonText = () => {
         if (!isWalletConnected) return 'Connect Wallet';
+        if (!amountIn) return 'Enter an amount';
+        if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
+        
+        if (isWrapping) return isSwapping ? 'Wrapping...' : 'Wrap';
+        if (isUnwrapping) return isSwapping ? 'Unwrapping...' : 'Unwrap';
+        
         if (isQuoteLoading) return 'Fetching price...';
         if (isApproving) return 'Approving...';
         if (isSwapping) return 'Swapping...';
-        if (!amountIn) return 'Enter an amount';
         if (parseFloat(amountIn) > 0 && !amountOut && !error) return 'Getting quote...';
-        if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
         return 'Swap';
     };
 
-    // FIX: The `openWalletModal` function is not directly compatible with the `onClick` event handler type.
-    // It is wrapped in an arrow function to ensure it's called correctly without arguments when the button is clicked.
-    const handleButtonClick = isWalletConnected ? handleSwap : () => openWalletModal();
+    const handleButtonClick = () => {
+        if (!isWalletConnected) {
+            openWalletModal();
+            return;
+        }
+        if (isWrapping) {
+            handleWrap();
+        } else if (isUnwrapping) {
+            handleUnwrap();
+        } else {
+            handleSwap();
+        }
+    };
 
     return (
         <div className="w-full max-w-md bg-brand-surface rounded-2xl p-4 sm:p-6 shadow-2xl border border-brand-secondary">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Swap</h2>
-                <button onClick={() => setSettingsOpen(true)} className="text-brand-text-secondary hover:text-brand-text-primary">
-                    <SettingsIcon className="w-6 h-6" />
-                </button>
+                {!(isWrapping || isUnwrapping) && (
+                    <button onClick={() => setSettingsOpen(true)} className="text-brand-text-secondary hover:text-brand-text-primary">
+                        <SettingsIcon className="w-6 h-6" />
+                    </button>
+                )}
             </div>
             <div className="relative">
                 <TokenInput
@@ -323,7 +418,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     balance={balanceOut?.formatted}
                     isBalanceLoading={isBalanceOutLoading}
                     isOutput={true}
-                    isQuoteLoading={isQuoteLoading}
+                    isQuoteLoading={isQuoteLoading && !isWrapping && !isUnwrapping}
                 />
             </div>
             <button
