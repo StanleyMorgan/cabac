@@ -4,7 +4,7 @@ import { formatUnits, parseUnits } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import type { Token } from '../types';
 import { TOKENS_BY_CHAIN, NATIVE_TOKEN_ADDRESS, POOLS_BY_CHAIN } from '../constants';
-import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI, WETH_ABI } from '../config';
+import { CONTRACT_ADDRESSES, ROUTER_ABI, ERC20_ABI, WETH_ABI, QUOTER_V2_ABI } from '../config';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAppKit } from '@reown/appkit/react';
 
@@ -102,63 +102,31 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [tokens, tokenIn, tokenOut, chainId, pools]);
 
-    // Combined effect to check allowance and fetch quote sequentially
+    // Effect to fetch quote using QuoterV2, independent of allowance
     useEffect(() => {
-        const fetchQuoteAndCheckAllowance = async () => {
-            // Reset states for each new calculation
+        const getQuote = async () => {
             setAmountOut('');
-            setError(null);
-            setNeedsApproval(false);
-
+            // Only clear the error if we are not in a state that requires user action (approval)
+            if (!needsApproval) {
+                setError(null);
+            }
+            
             if (isWrapping || isUnwrapping) {
-                setAmountOut(amountIn);
+                setAmountOut(debouncedAmountIn);
                 return;
             }
 
-            if (!isWalletConnected || !address || !chain || !publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address) {
+            if (!publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address || !chain) {
                 return;
             }
-            
-            setIsCheckingAllowance(true);
+
             setIsQuoteLoading(true);
-
-            let isApprovalNeeded = false;
-            const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
-
-            // 1. Check Allowance first
-            if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
-                try {
-                    if (routerAddress) {
-                        const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
-                        const allowance = await publicClient.readContract({
-                            address: tokenIn.address as `0x${string}`,
-                            abi: ERC20_ABI,
-                            functionName: 'allowance',
-                            args: [address, routerAddress],
-                        } as any);
-                        isApprovalNeeded = (allowance as bigint) < amountInParsed;
-                    }
-                } catch (e) {
-                    console.error("Failed to check allowance:", e);
-                }
-            }
-            
-            setNeedsApproval(isApprovalNeeded);
-            setIsCheckingAllowance(false);
-
-            // 2. If approval is needed, stop and do not fetch a quote.
-            // This prevents the "STF" error and avoids showing a misleading error message.
-            if (isApprovalNeeded) {
-                setIsQuoteLoading(false);
-                return;
-            }
-
-            // 3. Get Quote (only if approval is sufficient)
             try {
-                if (!routerAddress) {
-                    throw new Error(`Router address not found for chain ${chain.id}`);
+                const quoterAddress = CONTRACT_ADDRESSES[chain.id]?.QUOTER_V2;
+                if (!quoterAddress) {
+                    throw new Error(`QuoterV2 address not found for chain ${chain.id}`);
                 }
-
+                
                 const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
                 const pool = pools.find(p => 
                     (p.token0.address.toLowerCase() === tokenIn.address.toLowerCase() && p.token1.address.toLowerCase() === tokenOut.address.toLowerCase()) ||
@@ -169,30 +137,29 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     throw new Error("No pool available for this pair.");
                 }
 
-                const swapParams = {
-                    tokenIn: tokenIn.address as `0x${string}`,
-                    tokenOut: tokenOut.address as `0x${string}`,
-                    fee: pool.fee,
-                    recipient: address,
-                    deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
-                    amountIn: amountInParsed,
-                    amountOutMinimum: 0n,
-                    sqrtPriceLimitX96: 0n,
-                };
-                
+                // FIX: Use `simulateContract` for `nonpayable` quote functions as recommended by `viem`'s strict typing.
+                // `readContract` is intended for `view` or `pure` functions, causing type errors with the QuoterV2 ABI.
                 const { result: quotedAmountOut } = await publicClient.simulateContract({
-                    account: address,
-                    address: routerAddress,
-                    abi: ROUTER_ABI,
-                    functionName: 'exactInputSingle',
-                    args: [swapParams],
-                    value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : 0n,
+                    address: quoterAddress,
+                    abi: QUOTER_V2_ABI,
+                    functionName: 'quoteExactInputSingle',
+                    args: [{
+                        tokenIn: tokenIn.address as `0x${string}`,
+                        tokenOut: tokenOut.address as `0x${string}`,
+                        amountIn: amountInParsed,
+                        fee: pool.fee,
+                        sqrtPriceLimitX96: 0n,
+                    }]
                 });
-                
-                setAmountOut(formatUnits(quotedAmountOut as bigint, tokenOut.decimals));
+
+                // QuoterV2 returns a tuple (amountOut, ...), so we take the first element.
+                // The `result` from `simulateContract` is correctly typed, so `as bigint` is not needed.
+                const amountOutFormatted = formatUnits(quotedAmountOut[0], tokenOut.decimals);
+                setAmountOut(amountOutFormatted);
+
             } catch (err: any) {
-                console.error("%c[SWAP_CARD] Failed to get quote. Full error object:", 'color: red; font-weight: bold;', err);
-                if (err.message?.includes("No pool available")) {
+                console.error("%c[SWAP_CARD] Failed to get quote from QuoterV2. Full error object:", 'color: red; font-weight: bold;', err);
+                 if (err.message?.includes("No pool available")) {
                      setError("No pool available for this pair.");
                 } else {
                      setError("Could not fetch a quote. The pool may have low liquidity.");
@@ -202,8 +169,43 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             }
         };
 
-        fetchQuoteAndCheckAllowance();
-    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping, amountIn, isWalletConnected]);
+        getQuote();
+    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, chain, pools, isWrapping, isUnwrapping, needsApproval]);
+
+
+    // Effect to check allowance
+    useEffect(() => {
+        const checkAllowance = async () => {
+            if (!isWalletConnected || !address || !chain || !publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || tokenIn.address === NATIVE_TOKEN_ADDRESS) {
+                setNeedsApproval(false);
+                return;
+            }
+
+            setIsCheckingAllowance(true);
+            try {
+                const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+                if (routerAddress) {
+                    const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
+                    const allowance = await publicClient.readContract({
+                        address: tokenIn.address as `0x${string}`,
+                        abi: ERC20_ABI,
+                        functionName: 'allowance',
+                        args: [address, routerAddress],
+                    } as any);
+                    setNeedsApproval((allowance as bigint) < amountInParsed);
+                } else {
+                    setNeedsApproval(false);
+                }
+            } catch (e) {
+                console.error("Failed to check allowance:", e);
+                setNeedsApproval(false);
+            } finally {
+                setIsCheckingAllowance(false);
+            }
+        };
+
+        checkAllowance();
+    }, [debouncedAmountIn, tokenIn, address, chain, isWalletConnected, publicClient]);
 
 
     const handleTokenSelect = (token: Token) => {
@@ -356,16 +358,19 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 sqrtPriceLimitX96: 0n,
             };
 
-            const swapTx = await walletClient.writeContract({
+            // We must use simulateContract here before swapping to validate the transaction
+            const { request } = await publicClient.simulateContract({
+                account: address,
                 address: routerAddress,
                 abi: ROUTER_ABI,
                 functionName: 'exactInputSingle',
                 args: [swapParams],
                 value: tokenIn.address === NATIVE_TOKEN_ADDRESS ? amountInParsed : 0n,
-                chain,
-                account: address,
             });
-             await publicClient.waitForTransactionReceipt({ hash: swapTx });
+
+            const swapTx = await walletClient.writeContract(request);
+
+            await publicClient.waitForTransactionReceipt({ hash: swapTx });
             
             refetchBalanceIn();
             refetchBalanceOut();
@@ -389,7 +394,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         isSwapping || 
         isCheckingAllowance ||
         parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0') ||
-        (!(isWrapping || isUnwrapping) && !amountOut && !needsApproval)
+        (!(isWrapping || isUnwrapping) && !amountOut && !needsApproval && parseFloat(amountIn) > 0)
     );
 
     const buttonText = () => {
