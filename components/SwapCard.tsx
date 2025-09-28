@@ -14,6 +14,7 @@ import SettingsModal from './SettingsModal';
 import { ArrowDownIcon } from './icons/ArrowDownIcon';
 import { SettingsIcon } from './icons/SettingsIcon';
 
+const MAX_UINT256 = 2n**256n - 1n;
 
 interface SwapCardProps {
     isWalletConnected: boolean;
@@ -74,34 +75,34 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     }, []);
 
     useEffect(() => {
-        // This effect ensures that when the network (and thus the available `tokens`) changes,
-        // the selected tokens are reset to valid defaults for the new network.
         const tokenInIsValid = tokens.some(t => t.address.toLowerCase() === tokenIn?.address?.toLowerCase());
         const tokenOutIsValid = tokens.some(t => t.address.toLowerCase() === tokenOut?.address?.toLowerCase());
     
-        // If either of the selected tokens is not valid for the current chain, reset them.
-        if (!tokenInIsValid || !tokenOutIsValid) {
+        if (!tokenInIsValid || !tokenOutIsValid || !tokens.length) {
+            console.log(`%c[SWAP_CARD] Chain Changed to: ${chainId}`, 'color: cyan; font-weight: bold;');
+            console.log('[SWAP_CARD] Tokens for this chain:', tokens);
+            console.log('[SWAP_CARD] Pools for this chain:', pools);
+            
             if (tokens.length > 1) {
                 setTokenIn(tokens[0]);
                 setTokenOut(tokens[1]);
             } else if (tokens.length === 1) {
                 setTokenIn(tokens[0]);
-                setTokenOut({} as Token); // Use an empty object if there's no second token
+                setTokenOut({} as Token);
             } else {
                 setTokenIn({} as Token);
                 setTokenOut({} as Token);
             }
-            // Also reset amounts and errors to prevent stale state.
             setAmountIn('');
             setAmountOut('');
             setError(null);
         }
-    }, [tokens, tokenIn, tokenOut]);
+    }, [tokens, tokenIn, tokenOut, chainId, pools]);
 
     useEffect(() => {
         const getQuote = async () => {
             if (isWrapping || isUnwrapping) {
-                setAmountOut(amountIn); // 1:1 ratio for wrap/unwrap
+                setAmountOut(amountIn);
                 setError(null);
                 setIsQuoteLoading(false);
                 return;
@@ -127,7 +128,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     (p.token0.address.toLowerCase() === tokenOut.address.toLowerCase() && p.token1.address.toLowerCase() === tokenIn.address.toLowerCase())
                 );
                 
-                if (!pool) {
+                if (pool) {
+                    console.log('%c[SWAP_CARD] Found Pool for Quote:', 'color: lightgreen; font-weight: bold;', pool);
+                } else {
+                    console.error('%c[SWAP_CARD] Could not find a pool for the selected pair.', 'color: red; font-weight: bold;');
                     setError("No pool available for this pair.");
                     setAmountOut('');
                     setIsQuoteLoading(false);
@@ -145,6 +149,12 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     sqrtPriceLimitX96: 0n,
                 };
                 
+                console.log('%c[SWAP_CARD] Simulating contract with params:', 'color: orange; font-weight: bold;', {
+                    ...swapParams,
+                    amountIn: swapParams.amountIn.toString(),
+                    deadline: swapParams.deadline.toString(),
+                });
+                
                 const { result: quotedAmountOut } = await publicClient.simulateContract({
                     account: address || '0x0000000000000000000000000000000000000000',
                     address: routerAddress,
@@ -157,7 +167,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 setAmountOut(formatUnits(quotedAmountOut as bigint, tokenOut.decimals));
 
             } catch (err) {
-                console.error("Failed to get quote:", err);
+                console.error("%c[SWAP_CARD] Failed to get quote. Full error object:", 'color: red; font-weight: bold;', err);
                 setAmountOut('');
                 setError("Could not fetch a quote. The pool may have low liquidity.");
             } finally {
@@ -273,7 +283,13 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
             
             if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
                 setIsApproving(true);
-                 // FIX: Cast to any to work around a deep type instantiation issue in viem.
+
+                console.log('%c[SWAP_CARD] Checking allowance...', 'color: #999; font-weight: bold;', {
+                    owner: address,
+                    spender: routerAddress,
+                    token: tokenIn.address
+                });
+
                  const allowance = await publicClient.readContract({
                     address: tokenIn.address as `0x${string}`,
                     abi: ERC20_ABI,
@@ -281,43 +297,47 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                     args: [address, routerAddress],
                 } as any);
 
-                // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+                console.log('%c[SWAP_CARD] Allowance received:', 'color: #999; font-weight: bold;', {
+                    allowance: (allowance as bigint).toString(),
+                    amountIn: amountInParsed.toString(),
+                    needsApproval: (allowance as bigint) < amountInParsed,
+                });
+
                 if ((allowance as bigint) < amountInParsed) {
-                    // FIX: Add chain parameter to writeContract call.
-                    // FIX: Add account to writeContract call.
+                    console.log('%c[SWAP_CARD] Allowance is insufficient. Sending approve transaction for MAX_UINT256...', 'color: orange; font-weight: bold;');
+                    
                     const approveTx = await walletClient.writeContract({
                         address: tokenIn.address as `0x${string}`,
                         abi: ERC20_ABI,
                         functionName: 'approve',
-                        args: [routerAddress, amountInParsed],
+                        args: [routerAddress, MAX_UINT256],
                         chain,
                         account: address,
                     });
+                    
+                    console.log('%c[SWAP_CARD] Waiting for approve transaction receipt...', 'color: orange; font-weight: bold;', { hash: approveTx });
                     await publicClient.waitForTransactionReceipt({ hash: approveTx });
+                    console.log('%c[SWAP_CARD] Approve transaction successful!', 'color: lightgreen; font-weight: bold;');
                 }
                 setIsApproving(false);
             }
 
             setIsSwapping(true);
             const amountOutParsed = parseUnits(amountOut, tokenOut.decimals);
-            const slippageTolerance = BigInt(10000 - Math.floor(slippage * 100)); // e.g. 0.5% -> 9950
+            const slippageTolerance = BigInt(10000 - Math.floor(slippage * 100));
             const amountOutMinimum = (amountOutParsed * slippageTolerance) / 10000n;
 
-
-            // FIX: Ensure deadline and sqrtPriceLimitX96 are bigints.
             const swapParams = {
                 tokenIn: tokenIn.address as `0x${string}`,
                 tokenOut: tokenOut.address as `0x${string}`,
                 fee: pool.fee,
                 recipient: address,
-                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20), // 20 minutes from now
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
                 amountIn: amountInParsed,
                 amountOutMinimum: amountOutMinimum,
                 sqrtPriceLimitX96: 0n,
             };
 
-            // FIX: Add chain parameter to writeContract call.
-            // FIX: Add account to writeContract call.
             const swapTx = await walletClient.writeContract({
                 address: routerAddress,
                 abi: ROUTER_ABI,

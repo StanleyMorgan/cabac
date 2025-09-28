@@ -11,6 +11,7 @@ interface IncreaseLiquidityCardProps {
   onBack: () => void;
 }
 
+const MAX_UINT256 = 2n**256n - 1n;
 
 const IncreaseLiquidityCard: React.FC<IncreaseLiquidityCardProps> = ({ position, onBack }) => {
     const { address, chain, isConnected } = useAccount();
@@ -62,60 +63,71 @@ const IncreaseLiquidityCard: React.FC<IncreaseLiquidityCardProps> = ({ position,
             const amount1Parsed = parseUnits(amount1, token1.decimals);
     
             // --- Approve Token 0 ---
-             // FIX: Cast to any to work around a deep type instantiation issue in viem.
+            console.log(`%c[INCREASE_LIQUIDITY] Checking allowance for ${token0.symbol}...`, 'color: #999; font-weight: bold;');
             const allowance0 = await publicClient.readContract({
                 address: token0.address as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'allowance',
                 args: [address, positionManagerAddress],
             } as any);
+            console.log(`%c[INCREASE_LIQUIDITY] Allowance for ${token0.symbol}:`, 'color: #999;', { allowance: (allowance0 as bigint).toString(), needed: amount0Parsed.toString() });
             
-            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
             if ((allowance0 as bigint) < amount0Parsed) {
+                console.log(`%c[INCREASE_LIQUIDITY] Approving ${token0.symbol} for MAX_UINT256...`, 'color: orange; font-weight: bold;');
                 const approveTx0 = await walletClient.writeContract({
                     address: token0.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [positionManagerAddress, amount0Parsed],
+                    args: [positionManagerAddress, MAX_UINT256],
                     chain,
                     account: address,
                 });
                 await publicClient.waitForTransactionReceipt({ hash: approveTx0 });
+                console.log(`%c[INCREASE_LIQUIDITY] ${token0.symbol} approved!`, 'color: lightgreen;');
             }
     
             // --- Approve Token 1 ---
-             // FIX: Cast to any to work around a deep type instantiation issue in viem.
+            console.log(`%c[INCREASE_LIQUIDITY] Checking allowance for ${token1.symbol}...`, 'color: #999; font-weight: bold;');
             const allowance1 = await publicClient.readContract({
                 address: token1.address as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'allowance',
                 args: [address, positionManagerAddress],
             } as any);
-    
-            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+            console.log(`%c[INCREASE_LIQUIDITY] Allowance for ${token1.symbol}:`, 'color: #999;', { allowance: (allowance1 as bigint).toString(), needed: amount1Parsed.toString() });
+
             if ((allowance1 as bigint) < amount1Parsed) {
+                console.log(`%c[INCREASE_LIQUIDITY] Approving ${token1.symbol} for MAX_UINT256...`, 'color: orange; font-weight: bold;');
                 const approveTx1 = await walletClient.writeContract({
                     address: token1.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [positionManagerAddress, amount1Parsed],
+                    args: [positionManagerAddress, MAX_UINT256],
                     chain,
                     account: address,
                 });
                 await publicClient.waitForTransactionReceipt({ hash: approveTx1 });
+                 console.log(`%c[INCREASE_LIQUIDITY] ${token1.symbol} approved!`, 'color: lightgreen;');
             }
     
             setStatus('increasing');
             
-            // --- Increase Liquidity ---
             const increaseParams = {
                 tokenId: position.id,
                 amount0Desired: amount0Parsed,
                 amount1Desired: amount1Parsed,
-                amount0Min: 0n, // We accept any amount of slippage for simplicity
+                amount0Min: 0n,
                 amount1Min: 0n,
-                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20), // 20 minutes from now
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             };
+
+            console.log('%c[INCREASE_LIQUIDITY] Calling increaseLiquidity with params:', 'color: orange; font-weight: bold;', {
+                ...increaseParams,
+                tokenId: increaseParams.tokenId.toString(),
+                amount0Desired: increaseParams.amount0Desired.toString(),
+                amount1Desired: increaseParams.amount1Desired.toString(),
+                deadline: increaseParams.deadline.toString(),
+            });
     
             const increaseTx = await walletClient.writeContract({
                 address: positionManagerAddress,
@@ -128,16 +140,15 @@ const IncreaseLiquidityCard: React.FC<IncreaseLiquidityCardProps> = ({ position,
     
             await publicClient.waitForTransactionReceipt({ hash: increaseTx });
     
-            // Success
             refetchBalance0();
             refetchBalance1();
             setAmount0('');
             setAmount1('');
             setStatus('idle');
-            onBack(); // Go back to the pools list
+            onBack();
     
         } catch (err: any) {
-            console.error(err);
+            console.error("%c[INCREASE_LIQUIDITY] Failed to increase liquidity. Full error:", 'color: red; font-weight: bold;', err);
             setError(err.shortMessage || "An error occurred while adding liquidity.");
             setStatus('idle');
         }

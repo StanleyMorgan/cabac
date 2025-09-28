@@ -11,6 +11,7 @@ interface AddLiquidityCardProps {
   onBack: () => void;
 }
 
+const MAX_UINT256 = 2n**256n - 1n;
 
 const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => {
     const { address, chain, isConnected } = useAccount();
@@ -39,7 +40,6 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
         const fetchTickSpacing = async () => {
             if (!publicClient || !pool.address) return;
             try {
-                // FIX: Cast to any to work around a deep type instantiation issue in viem.
                 const spacing = await publicClient.readContract({
                     address: pool.address as `0x${string}`,
                     abi: POOL_ABI,
@@ -82,56 +82,57 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
             const amount1Parsed = parseUnits(amount1, pool.token1.decimals);
     
             // --- Approve Token 0 ---
-             // FIX: Cast to any to work around a deep type instantiation issue in viem.
+            console.log(`%c[ADD_LIQUIDITY] Checking allowance for ${pool.token0.symbol}...`, 'color: #999; font-weight: bold;');
             const allowance0 = await publicClient.readContract({
                 address: pool.token0.address as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'allowance',
                 args: [address, positionManagerAddress],
             } as any);
+            console.log(`%c[ADD_LIQUIDITY] Allowance for ${pool.token0.symbol}:`, 'color: #999;', { allowance: (allowance0 as bigint).toString(), needed: amount0Parsed.toString() });
             
-            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
             if ((allowance0 as bigint) < amount0Parsed) {
+                console.log(`%c[ADD_LIQUIDITY] Approving ${pool.token0.symbol} for MAX_UINT256...`, 'color: orange; font-weight: bold;');
                 const approveTx0 = await walletClient.writeContract({
                     address: pool.token0.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [positionManagerAddress, amount0Parsed],
+                    args: [positionManagerAddress, MAX_UINT256],
                     chain,
                     account: address,
                 });
                 await publicClient.waitForTransactionReceipt({ hash: approveTx0 });
+                console.log(`%c[ADD_LIQUIDITY] ${pool.token0.symbol} approved!`, 'color: lightgreen;');
             }
     
             // --- Approve Token 1 ---
-             // FIX: Cast to any to work around a deep type instantiation issue in viem.
+            console.log(`%c[ADD_LIQUIDITY] Checking allowance for ${pool.token1.symbol}...`, 'color: #999; font-weight: bold;');
             const allowance1 = await publicClient.readContract({
                 address: pool.token1.address as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'allowance',
                 args: [address, positionManagerAddress],
             } as any);
-    
-            // FIX: Cast allowance to bigint as readContract result is unknown due to `as any`.
+            console.log(`%c[ADD_LIQUIDITY] Allowance for ${pool.token1.symbol}:`, 'color: #999;', { allowance: (allowance1 as bigint).toString(), needed: amount1Parsed.toString() });
+            
             if ((allowance1 as bigint) < amount1Parsed) {
+                console.log(`%c[ADD_LIQUIDITY] Approving ${pool.token1.symbol} for MAX_UINT256...`, 'color: orange; font-weight: bold;');
                 const approveTx1 = await walletClient.writeContract({
                     address: pool.token1.address as `0x${string}`,
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [positionManagerAddress, amount1Parsed],
+                    args: [positionManagerAddress, MAX_UINT256],
                     chain,
                     account: address,
                 });
                 await publicClient.waitForTransactionReceipt({ hash: approveTx1 });
+                console.log(`%c[ADD_LIQUIDITY] ${pool.token1.symbol} approved!`, 'color: lightgreen;');
             }
     
             setStatus('minting');
             
-            // --- Mint Position ---
-            // For a "full range" position, we use the min and max possible ticks, adjusted for the pool's tick spacing.
             const MIN_TICK = -887272;
             const MAX_TICK = 887272;
-            // FIX: tickLower and tickUpper should be numbers for `int24` types, not bigints.
             const tickLower = Math.ceil(MIN_TICK / tickSpacing) * tickSpacing;
             const tickUpper = Math.floor(MAX_TICK / tickSpacing) * tickSpacing;
     
@@ -143,11 +144,18 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
                 tickUpper,
                 amount0Desired: amount0Parsed,
                 amount1Desired: amount1Parsed,
-                amount0Min: 0n, // We accept any amount of slippage for simplicity
+                amount0Min: 0n,
                 amount1Min: 0n,
                 recipient: address,
-                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20), // 20 minutes from now
+                deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
             };
+
+            console.log('%c[ADD_LIQUIDITY] Calling mint with params:', 'color: orange; font-weight: bold;', {
+                ...mintParams,
+                amount0Desired: mintParams.amount0Desired.toString(),
+                amount1Desired: mintParams.amount1Desired.toString(),
+                deadline: mintParams.deadline.toString(),
+            });
     
             const mintTx = await walletClient.writeContract({
                 address: positionManagerAddress,
@@ -160,16 +168,15 @@ const AddLiquidityCard: React.FC<AddLiquidityCardProps> = ({ pool, onBack }) => 
     
             await publicClient.waitForTransactionReceipt({ hash: mintTx });
     
-            // Success
             refetchBalance0();
             refetchBalance1();
             setAmount0('');
             setAmount1('');
             setStatus('idle');
-            onBack(); // Go back to the pools list
+            onBack();
     
         } catch (err: any) {
-            console.error(err);
+            console.error("%c[ADD_LIQUIDITY] Failed to add liquidity. Full error:", 'color: red; font-weight: bold;', err);
             setError(err.shortMessage || "An error occurred while adding liquidity.");
             setStatus('idle');
         }
