@@ -102,108 +102,86 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [tokens, tokenIn, tokenOut, chainId, pools]);
 
-    // Effect to check allowance
+    // Combined effect to check allowance and fetch quote sequentially
     useEffect(() => {
-        const checkAllowance = async () => {
-            if (!publicClient || !address || !chain || !tokenIn?.address || tokenIn.address === NATIVE_TOKEN_ADDRESS || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0) {
-                setNeedsApproval(false);
-                return;
-            }
-
-            setIsCheckingAllowance(true);
-            try {
-                const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
-                const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
-                if (!routerAddress) {
-                    setNeedsApproval(false);
-                    return;
-                }
-
-                const allowance = await publicClient.readContract({
-                    address: tokenIn.address as `0x${string}`,
-                    abi: ERC20_ABI,
-                    functionName: 'allowance',
-                    args: [address, routerAddress],
-                } as any);
-
-                setNeedsApproval((allowance as bigint) < amountInParsed);
-            } catch (e) {
-                console.error("Failed to check allowance:", e);
-                setNeedsApproval(false);
-            } finally {
-                setIsCheckingAllowance(false);
-            }
-        };
-
-        checkAllowance();
-    }, [debouncedAmountIn, tokenIn, publicClient, address, chain]);
-
-
-    useEffect(() => {
-        const getQuote = async () => {
-             // Don't fetch quote if an approval is needed, and clear any previous quote errors.
-            if (needsApproval) {
-                setAmountOut('');
-                setError(null);
-                return;
-            }
+        const fetchQuoteAndCheckAllowance = async () => {
+            // Reset states for each new calculation
+            setAmountOut('');
+            setError(null);
+            setNeedsApproval(false);
 
             if (isWrapping || isUnwrapping) {
                 setAmountOut(amountIn);
-                setError(null);
+                return;
+            }
+
+            if (!isWalletConnected || !address || !chain || !publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address) {
+                return;
+            }
+            
+            setIsCheckingAllowance(true);
+            setIsQuoteLoading(true);
+
+            let isApprovalNeeded = false;
+            const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+
+            // 1. Check Allowance first
+            if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
+                try {
+                    if (routerAddress) {
+                        const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
+                        const allowance = await publicClient.readContract({
+                            address: tokenIn.address as `0x${string}`,
+                            abi: ERC20_ABI,
+                            functionName: 'allowance',
+                            args: [address, routerAddress],
+                        } as any);
+                        isApprovalNeeded = (allowance as bigint) < amountInParsed;
+                    }
+                } catch (e) {
+                    console.error("Failed to check allowance:", e);
+                }
+            }
+            
+            setNeedsApproval(isApprovalNeeded);
+            setIsCheckingAllowance(false);
+
+            // 2. If approval is needed, stop and do not fetch a quote.
+            // This prevents the "STF" error and avoids showing a misleading error message.
+            if (isApprovalNeeded) {
                 setIsQuoteLoading(false);
                 return;
             }
 
-            if (!publicClient || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0 || !tokenIn?.address || !tokenOut?.address || !chain) {
-                setAmountOut('');
-                return;
-            }
-
-            setIsQuoteLoading(true);
-            setError(null);
+            // 3. Get Quote (only if approval is sufficient)
             try {
-                const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
-                const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
-
                 if (!routerAddress) {
                     throw new Error(`Router address not found for chain ${chain.id}`);
                 }
-                
+
+                const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
                 const pool = pools.find(p => 
                     (p.token0.address.toLowerCase() === tokenIn.address.toLowerCase() && p.token1.address.toLowerCase() === tokenOut.address.toLowerCase()) ||
                     (p.token0.address.toLowerCase() === tokenOut.address.toLowerCase() && p.token1.address.toLowerCase() === tokenIn.address.toLowerCase())
                 );
                 
-                if (pool) {
-                    console.log('%c[SWAP_CARD] Found Pool for Quote:', 'color: lightgreen; font-weight: bold;', pool);
-                } else {
-                    console.error('%c[SWAP_CARD] Could not find a pool for the selected pair.', 'color: red; font-weight: bold;');
-                    setError("No pool available for this pair.");
-                    setAmountOut('');
-                    setIsQuoteLoading(false);
-                    return;
+                if (!pool) {
+                    throw new Error("No pool available for this pair.");
                 }
 
                 const swapParams = {
                     tokenIn: tokenIn.address as `0x${string}`,
                     tokenOut: tokenOut.address as `0x${string}`,
                     fee: pool.fee,
-                    recipient: address || '0x0000000000000000000000000000000000000000',
+                    recipient: address,
                     deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
                     amountIn: amountInParsed,
                     amountOutMinimum: 0n,
                     sqrtPriceLimitX96: 0n,
                 };
                 
-                console.log('%c[SWAP_CARD] Simulating contract with params:', 'color: orange; font-weight: bold;', {
-                    ...swapParams,
-                    amountIn: swapParams.amountIn.toString(),
-                    deadline: swapParams.deadline.toString(),
-                });
-                
                 const { result: quotedAmountOut } = await publicClient.simulateContract({
-                    account: address || '0x0000000000000000000000000000000000000000',
+                    account: address,
                     address: routerAddress,
                     abi: ROUTER_ABI,
                     functionName: 'exactInputSingle',
@@ -212,18 +190,21 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
                 });
                 
                 setAmountOut(formatUnits(quotedAmountOut as bigint, tokenOut.decimals));
-
-            } catch (err) {
+            } catch (err: any) {
                 console.error("%c[SWAP_CARD] Failed to get quote. Full error object:", 'color: red; font-weight: bold;', err);
-                setAmountOut('');
-                setError("Could not fetch a quote. The pool may have low liquidity.");
+                if (err.message?.includes("No pool available")) {
+                     setError("No pool available for this pair.");
+                } else {
+                     setError("Could not fetch a quote. The pool may have low liquidity.");
+                }
             } finally {
                 setIsQuoteLoading(false);
             }
         };
 
-        getQuote();
-    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping, needsApproval]);
+        fetchQuoteAndCheckAllowance();
+    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping, amountIn, isWalletConnected]);
+
 
     const handleTokenSelect = (token: Token) => {
         if (selectingFor === 'in') {
