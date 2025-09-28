@@ -77,6 +77,8 @@ const USDC_SEPOLIA: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    // NOTE: The user has confirmed that their specific testnet version of this token uses 18 decimals.
+    // Standard testnet USDC usually has 6. This is a deliberate configuration.
     decimals: 18,
 };
 
@@ -95,6 +97,8 @@ const USDC_BASE_SEPOLIA: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    // NOTE: The user has confirmed that their specific testnet version of this token uses 18 decimals.
+    // Standard testnet USDC usually has 6. This is a deliberate configuration.
     decimals: 18,
 };
 
@@ -103,6 +107,8 @@ const USDT_BASE_SEPOLIA: Token = {
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    // NOTE: The user has confirmed that their specific testnet version of this token uses 18 decimals.
+    // Standard testnet USDT usually has 6. This is a deliberate configuration.
     decimals: 18,
 };
 
@@ -129,6 +135,8 @@ const USDT_CELO_SEPOLIA: Token = {
     symbol: 'USDT',
     name: 'Tether USD',
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    // NOTE: The user has confirmed that their specific testnet version of this token uses 18 decimals.
+    // Standard testnet USDT usually has 6. This is a deliberate configuration.
     decimals: 18,
 };
 
@@ -137,6 +145,8 @@ const USDC_CELO_SEPOLIA: Token = {
     symbol: 'USDC',
     name: 'USD Coin',
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    // NOTE: The user has confirmed that their specific testnet version of this token uses 18 decimals.
+    // Standard testnet USDC usually has 6. This is a deliberate configuration.
     decimals: 18,
 };
 
