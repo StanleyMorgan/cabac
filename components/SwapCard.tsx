@@ -141,9 +141,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
     useEffect(() => {
         const getQuote = async () => {
-             // Don't fetch quote if an approval is needed
+             // Don't fetch quote if an approval is needed, and clear any previous quote errors.
             if (needsApproval) {
                 setAmountOut('');
+                setError(null);
                 return;
             }
 
