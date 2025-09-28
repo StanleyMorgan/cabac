@@ -2,7 +2,9 @@ import React from 'react';
 import { WagmiProvider, http, type Config } from 'wagmi';
 import { base, sepolia, baseSepolia, celoSepolia } from 'viem/chains';
 import { type Chain } from 'viem';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// FIX: Import `QueryClient` from `@tanstack/query-core` to resolve module resolution issues.
+import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/query-core';
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 

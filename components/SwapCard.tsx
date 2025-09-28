@@ -47,6 +47,9 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const [isQuoteLoading, setIsQuoteLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [needsApproval, setNeedsApproval] = useState(false);
+    const [isCheckingAllowance, setIsCheckingAllowance] = useState(false);
+
     const { data: balanceIn, isLoading: isBalanceInLoading, refetch: refetchBalanceIn } = useBalance({
         address,
         token: tokenIn.address === NATIVE_TOKEN_ADDRESS ? undefined : tokenIn.address as `0x${string}`,
@@ -99,8 +102,51 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     }, [tokens, tokenIn, tokenOut, chainId, pools]);
 
+    // Effect to check allowance
+    useEffect(() => {
+        const checkAllowance = async () => {
+            if (!publicClient || !address || !chain || !tokenIn?.address || tokenIn.address === NATIVE_TOKEN_ADDRESS || !debouncedAmountIn || parseFloat(debouncedAmountIn) <= 0) {
+                setNeedsApproval(false);
+                return;
+            }
+
+            setIsCheckingAllowance(true);
+            try {
+                const amountInParsed = parseUnits(debouncedAmountIn, tokenIn.decimals);
+                const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+                if (!routerAddress) {
+                    setNeedsApproval(false);
+                    return;
+                }
+
+                const allowance = await publicClient.readContract({
+                    address: tokenIn.address as `0x${string}`,
+                    abi: ERC20_ABI,
+                    functionName: 'allowance',
+                    args: [address, routerAddress],
+                } as any);
+
+                setNeedsApproval((allowance as bigint) < amountInParsed);
+            } catch (e) {
+                console.error("Failed to check allowance:", e);
+                setNeedsApproval(false);
+            } finally {
+                setIsCheckingAllowance(false);
+            }
+        };
+
+        checkAllowance();
+    }, [debouncedAmountIn, tokenIn, publicClient, address, chain]);
+
+
     useEffect(() => {
         const getQuote = async () => {
+             // Don't fetch quote if an approval is needed
+            if (needsApproval) {
+                setAmountOut('');
+                return;
+            }
+
             if (isWrapping || isUnwrapping) {
                 setAmountOut(amountIn);
                 setError(null);
@@ -176,7 +222,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         };
 
         getQuote();
-    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping]);
+    }, [debouncedAmountIn, tokenIn, tokenOut, publicClient, address, chain, pools, isWrapping, isUnwrapping, needsApproval]);
 
     const handleTokenSelect = (token: Token) => {
         if (selectingFor === 'in') {
@@ -262,10 +308,41 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         }
     };
 
+    const handleApprove = async () => {
+        if (!walletClient || !address || !chain || !tokenIn?.address || !publicClient) return;
+        
+        setIsApproving(true);
+        setError(null);
+        try {
+            const routerAddress = CONTRACT_ADDRESSES[chain.id]?.ROUTER;
+            if (!routerAddress) throw new Error("Router address not found");
+
+            const approveTx = await walletClient.writeContract({
+                address: tokenIn.address as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'approve',
+                args: [routerAddress, MAX_UINT256],
+                chain,
+                account: address,
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveTx });
+            
+            // Re-check allowance, should now be sufficient
+            setNeedsApproval(false);
+
+        } catch (err: any) {
+             console.error(err);
+            setError(err.shortMessage || "An error occurred during approval.");
+        } finally {
+            setIsApproving(false);
+        }
+    };
+
     const handleSwap = async () => {
         if (!walletClient || !address || !chain || !publicClient || !amountOut || isQuoteLoading) return;
 
         setError(null);
+        setIsSwapping(true);
         
         try {
             const amountInParsed = parseUnits(amountIn, tokenIn.decimals);
@@ -278,51 +355,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
 
             if (!pool) {
                 setError("No liquidity pool found for this pair.");
+                setIsSwapping(false);
                 return;
             }
             
-            if (tokenIn.address !== NATIVE_TOKEN_ADDRESS) {
-                setIsApproving(true);
-
-                console.log('%c[SWAP_CARD] Checking allowance...', 'color: #999; font-weight: bold;', {
-                    owner: address,
-                    spender: routerAddress,
-                    token: tokenIn.address
-                });
-
-                 const allowance = await publicClient.readContract({
-                    address: tokenIn.address as `0x${string}`,
-                    abi: ERC20_ABI,
-                    functionName: 'allowance',
-                    args: [address, routerAddress],
-                } as any);
-
-                console.log('%c[SWAP_CARD] Allowance received:', 'color: #999; font-weight: bold;', {
-                    allowance: (allowance as bigint).toString(),
-                    amountIn: amountInParsed.toString(),
-                    needsApproval: (allowance as bigint) < amountInParsed,
-                });
-
-                if ((allowance as bigint) < amountInParsed) {
-                    console.log('%c[SWAP_CARD] Allowance is insufficient. Sending approve transaction for MAX_UINT256...', 'color: orange; font-weight: bold;');
-                    
-                    const approveTx = await walletClient.writeContract({
-                        address: tokenIn.address as `0x${string}`,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [routerAddress, MAX_UINT256],
-                        chain,
-                        account: address,
-                    });
-                    
-                    console.log('%c[SWAP_CARD] Waiting for approve transaction receipt...', 'color: orange; font-weight: bold;', { hash: approveTx });
-                    await publicClient.waitForTransactionReceipt({ hash: approveTx });
-                    console.log('%c[SWAP_CARD] Approve transaction successful!', 'color: lightgreen; font-weight: bold;');
-                }
-                setIsApproving(false);
-            }
-
-            setIsSwapping(true);
             const amountOutParsed = parseUnits(amountOut, tokenOut.decimals);
             const slippageTolerance = BigInt(10000 - Math.floor(slippage * 100));
             const amountOutMinimum = (amountOutParsed * slippageTolerance) / 10000n;
@@ -369,8 +405,9 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         isQuoteLoading ||
         isApproving || 
         isSwapping || 
+        isCheckingAllowance ||
         parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0') ||
-        (!(isWrapping || isUnwrapping) && !amountOut)
+        (!(isWrapping || isUnwrapping) && !amountOut && !needsApproval)
     );
 
     const buttonText = () => {
@@ -378,11 +415,14 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
         if (!amountIn) return 'Enter an amount';
         if (parseFloat(amountIn) > parseFloat(balanceIn?.formatted || '0')) return `Insufficient ${tokenIn?.symbol} balance`;
         
+        if (isCheckingAllowance) return 'Checking allowance...';
+        if (needsApproval) return `Approve ${tokenIn.symbol}`;
+        if (isApproving) return 'Approving...';
+        
         if (isWrapping) return isSwapping ? 'Wrapping...' : 'Wrap';
         if (isUnwrapping) return isSwapping ? 'Unwrapping...' : 'Unwrap';
         
         if (isQuoteLoading) return 'Fetching price...';
-        if (isApproving) return 'Approving...';
         if (isSwapping) return 'Swapping...';
         if (parseFloat(amountIn) > 0 && !amountOut && !error) return 'Getting quote...';
         return 'Swap';
@@ -391,6 +431,10 @@ const SwapCard: React.FC<SwapCardProps> = ({ isWalletConnected }) => {
     const handleButtonClick = () => {
         if (!isWalletConnected) {
             openWalletModal();
+            return;
+        }
+        if (needsApproval) {
+            handleApprove();
             return;
         }
         if (isWrapping) {
