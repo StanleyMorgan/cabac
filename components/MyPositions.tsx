@@ -179,8 +179,6 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                 const v3Token0 = new V3Token(chain.id, token0.address, token0.decimals, token0.symbol, token0.name);
                                 const v3Token1 = new V3Token(chain.id, token1.address, token1.decimals, token1.symbol, token1.name);
                                 
-                                // FIX: Explicitly convert tick to a number, as the SDK expects a number, not a BigInt.
-                                // This prevents the 'Convert JSBI instances to native numbers' error.
                                 const tickCurrent = Number(poolData.slot0[1]);
 
                                 console.log(`%c[MyPositions] SDK Calculation Input for Position #${item.tokenId}`, 'color: #f0a;', {
@@ -195,12 +193,14 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                     tickUpper,
                                 });
                 
+                                // FIX: Pass BigInt values as strings to the SDK to prevent type clashes between native BigInt and JSBI.
+                                // The SDK is designed to safely handle string inputs for these parameters.
                                 const v3Pool = new V3Pool(
                                     v3Token0,
                                     v3Token1,
                                     fee,
-                                    JSBI.BigInt(poolData.slot0[0].toString()), // sqrtPriceX96
-                                    JSBI.BigInt(poolData.liquidity.toString()), // pool liquidity
+                                    poolData.slot0[0].toString(), // sqrtPriceX96
+                                    poolData.liquidity.toString(), // pool liquidity
                                     tickCurrent // tick
                                 );
                                 
