@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
-import { formatUnits } from 'viem';
-import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI } from '../config';
+import { CONTRACT_ADDRESSES, POSITION_MANAGER_ABI, POOL_ABI } from '../config';
 import { POOLS_BY_CHAIN, TOKENS_BY_CHAIN } from '../constants';
 import { Token, Pool } from '../types';
+import { Pool as V3Pool, Position as V3Position } from '@uniswap/v3-sdk';
+import { Token as V3Token } from '@uniswap/sdk-core';
+import JSBI from 'jsbi';
+
 
 export interface Position {
     id: bigint;
@@ -12,6 +15,10 @@ export interface Position {
     fee: number;
     liquidity: bigint;
     pool: Pool;
+    tickLower: number;
+    tickUpper: number;
+    amount0Formatted: string;
+    amount1Formatted: string;
 }
 
 interface MyPositionsProps {
@@ -95,14 +102,49 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                 
                 const positionsResults = await publicClient.multicall({ contracts: positionsCalls } as any);
 
-                const fetchedPositions: Position[] = positionsResults
+                const rawPositions = positionsResults
                     .map((r, i) => ({ result: r.result, tokenId: tokenIds[i] }))
-                    .filter(item => item.result)
+                    .filter(item => item.result);
+
+                const poolAddresses = [...new Set(rawPositions
+                    .map(({ result: posData }) => {
+                        const token0Addr = (posData[2] as string).toLowerCase();
+                        const token1Addr = (posData[3] as string).toLowerCase();
+                        const fee = posData[4];
+                        const [sortedAddr0, sortedAddr1] = [token0Addr, token1Addr].sort();
+                        const poolKey = `${sortedAddr0}-${sortedAddr1}-${fee}`;
+                        return poolLookup.get(poolKey)?.address;
+                    })
+                    .filter((addr): addr is `0x${string}` => !!addr)
+                )];
+
+                const slot0Calls = poolAddresses.map(address => ({
+                    address,
+                    abi: POOL_ABI,
+                    functionName: 'slot0'
+                }));
+        
+                const slot0Results = slot0Calls.length > 0
+                    ? await publicClient.multicall({ contracts: slot0Calls } as any)
+                    : [];
+
+                const slot0Map = new Map<string, any>();
+                poolAddresses.forEach((addr, i) => {
+                    if (slot0Results[i]?.status === 'success') {
+                        slot0Map.set(addr.toLowerCase(), slot0Results[i].result);
+                    }
+                });
+
+
+                const fetchedPositions: Position[] = rawPositions
                     .map(item => {
                         const posData = item.result as any;
                         const token0Addr = (posData[2] as string).toLowerCase();
                         const token1Addr = (posData[3] as string).toLowerCase();
                         const fee = posData[4];
+                        const tickLower = posData[5] as number;
+                        const tickUpper = posData[6] as number;
+                        const liquidity = posData[7] as bigint;
 
                         const token0 = tokensForChain.get(token0Addr);
                         const token1 = tokensForChain.get(token1Addr);
@@ -113,13 +155,50 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
                         if (!token0 || !token1 || !pool) return null;
 
+                        let amount0Formatted = '0';
+                        let amount1Formatted = '0';
+                        const slot0 = slot0Map.get(pool.address.toLowerCase());
+
+                        if (liquidity > 0n && slot0 && chain) {
+                            try {
+                                const v3Token0 = new V3Token(chain.id, token0.address, token0.decimals, token0.symbol, token0.name);
+                                const v3Token1 = new V3Token(chain.id, token1.address, token1.decimals, token1.symbol, token1.name);
+                
+                                const v3Pool = new V3Pool(
+                                    v3Token0,
+                                    v3Token1,
+                                    fee,
+                                    JSBI.BigInt(slot0[0].toString()), // sqrtPriceX96
+                                    JSBI.BigInt(0), // pool liquidity - not needed for position amount calculation
+                                    slot0[1] // tick
+                                );
+                                
+                                const v3Position = new V3Position({
+                                    pool: v3Pool,
+                                    liquidity: liquidity.toString(),
+                                    tickLower: tickLower,
+                                    tickUpper: tickUpper,
+                                });
+
+                                amount0Formatted = v3Position.amount0.toSignificant(6);
+                                amount1Formatted = v3Position.amount1.toSignificant(6);
+
+                            } catch (e) {
+                                console.error("MyPositions: Error calculating position amounts with SDK:", e);
+                            }
+                        }
+
                         return {
                             id: item.tokenId,
                             token0,
                             token1,
                             fee,
-                            liquidity: posData[7],
+                            liquidity,
                             pool,
+                            tickLower,
+                            tickUpper,
+                            amount0Formatted,
+                            amount1Formatted,
                         };
                     })
                     .filter((p): p is Position => p !== null);
@@ -128,13 +207,8 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     const aIsEmpty = a.liquidity === 0n;
                     const bIsEmpty = b.liquidity === 0n;
 
-                    if (aIsEmpty && !bIsEmpty) {
-                        return 1; // a (empty) goes after b (not empty)
-                    }
-                    if (!aIsEmpty && bIsEmpty) {
-                        return -1; // a (not empty) goes before b (empty)
-                    }
-                    // For positions of the same type, sort by newest first
+                    if (aIsEmpty && !bIsEmpty) return 1;
+                    if (!aIsEmpty && bIsEmpty) return -1;
                     return Number(b.id - a.id);
                 });
                 
@@ -226,7 +300,8 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                 {pos.liquidity > 0n ? (
                                      <>
                                         <div className="text-right mr-2">
-                                            <p className="font-mono text-sm">{formatUnits(pos.liquidity, 0)} LP</p>
+                                            <p className="font-mono text-sm font-semibold">{pos.amount0Formatted} {pos.token0.symbol}</p>
+                                            <p className="font-mono text-sm text-brand-text-secondary">{pos.amount1Formatted} {pos.token1.symbol}</p>
                                         </div>
                                         <button
                                             onClick={() => onRemove(pos)}
