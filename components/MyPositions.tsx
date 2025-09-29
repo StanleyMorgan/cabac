@@ -108,8 +108,6 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
                 const poolAddresses = [...new Set(rawPositions
                     .map(({ result: posData }) => {
-                        // FIX: Cast posData from 'unknown' to 'any' to allow property access.
-                        // The type is lost due to an `as any` cast on the multicall.
                         const data = posData as any;
                         const token0Addr = (data[2] as string).toLowerCase();
                         const token1Addr = (data[3] as string).toLowerCase();
@@ -126,24 +124,38 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                     abi: POOL_ABI,
                     functionName: 'slot0'
                 }));
-        
-                const slot0Results = slot0Calls.length > 0
-                    ? await publicClient.multicall({ contracts: slot0Calls } as any)
-                    : [];
 
-                const slot0Map = new Map<string, any>();
+                const liquidityCalls = poolAddresses.map(address => ({
+                    address,
+                    abi: POOL_ABI,
+                    functionName: 'liquidity'
+                }));
+        
+                const [slot0Results, liquidityResults] = await Promise.all([
+                    slot0Calls.length > 0
+                        ? publicClient.multicall({ contracts: slot0Calls } as any)
+                        : Promise.resolve([]),
+                    liquidityCalls.length > 0
+                        ? publicClient.multicall({ contracts: liquidityCalls } as any)
+                        : Promise.resolve([]),
+                ]);
+
+                const poolDataMap = new Map<string, { slot0: any; liquidity: any }>();
                 poolAddresses.forEach((addr, i) => {
-                    if (slot0Results[i]?.status === 'success') {
-                        slot0Map.set(addr.toLowerCase(), slot0Results[i].result);
+                    const slot0 = slot0Results[i]?.status === 'success' ? slot0Results[i].result : null;
+                    const liquidity = liquidityResults[i]?.status === 'success' ? liquidityResults[i].result : null;
+
+                    if (slot0 && liquidity !== null) {
+                        poolDataMap.set(addr.toLowerCase(), { slot0, liquidity });
                     }
                 });
-
 
                 const fetchedPositions: Position[] = rawPositions
                     .map(item => {
                         const posData = item.result as any;
-                        const token0Addr = (posData[2] as string).toLowerCase();
-                        const token1Addr = (posData[3] as string).toLowerCase();
+                        // FIX: Cast posData elements to `any` before calling `toLowerCase` to avoid type errors with `unknown`.
+                        const token0Addr = (posData[2] as any).toLowerCase();
+                        const token1Addr = (posData[3] as any).toLowerCase();
                         const fee = posData[4];
                         const tickLower = posData[5] as number;
                         const tickUpper = posData[6] as number;
@@ -160,9 +172,9 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
                         let amount0Formatted = '0';
                         let amount1Formatted = '0';
-                        const slot0 = slot0Map.get(pool.address.toLowerCase());
+                        const poolData = poolDataMap.get(pool.address.toLowerCase());
 
-                        if (liquidity > 0n && slot0 && chain) {
+                        if (liquidity > 0n && poolData && chain) {
                             try {
                                 const v3Token0 = new V3Token(chain.id, token0.address, token0.decimals, token0.symbol, token0.name);
                                 const v3Token1 = new V3Token(chain.id, token1.address, token1.decimals, token1.symbol, token1.name);
@@ -171,9 +183,9 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                     v3Token0,
                                     v3Token1,
                                     fee,
-                                    JSBI.BigInt(slot0[0].toString()), // sqrtPriceX96
-                                    JSBI.BigInt(0), // pool liquidity - not needed for position amount calculation
-                                    slot0[1] // tick
+                                    JSBI.BigInt(poolData.slot0[0].toString()), // sqrtPriceX96
+                                    JSBI.BigInt(poolData.liquidity.toString()), // pool liquidity
+                                    poolData.slot0[1] // tick
                                 );
                                 
                                 const v3Position = new V3Position({

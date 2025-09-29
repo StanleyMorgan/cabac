@@ -129,6 +129,15 @@ export const POOL_ABI = [
     },
     {
         "inputs": [],
+        "name": "liquidity",
+        "outputs": [
+            { "internalType": "uint128", "name": "", "type": "uint128" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
         "name": "tickSpacing",
         "outputs": [
             { "type": "int24", "name": "" }
