@@ -178,6 +178,22 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                             try {
                                 const v3Token0 = new V3Token(chain.id, token0.address, token0.decimals, token0.symbol, token0.name);
                                 const v3Token1 = new V3Token(chain.id, token1.address, token1.decimals, token1.symbol, token1.name);
+                                
+                                // FIX: Explicitly convert tick to a number, as the SDK expects a number, not a BigInt.
+                                // This prevents the 'Convert JSBI instances to native numbers' error.
+                                const tickCurrent = Number(poolData.slot0[1]);
+
+                                console.log(`%c[MyPositions] SDK Calculation Input for Position #${item.tokenId}`, 'color: #f0a;', {
+                                    token0: `${token0.symbol} (${token0.address})`,
+                                    token1: `${token1.symbol} (${token1.address})`,
+                                    fee,
+                                    sqrtPriceX96: poolData.slot0[0].toString(),
+                                    poolLiquidity: poolData.liquidity.toString(),
+                                    tickCurrent: tickCurrent,
+                                    positionLiquidity: liquidity.toString(),
+                                    tickLower,
+                                    tickUpper,
+                                });
                 
                                 const v3Pool = new V3Pool(
                                     v3Token0,
@@ -185,7 +201,7 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
                                     fee,
                                     JSBI.BigInt(poolData.slot0[0].toString()), // sqrtPriceX96
                                     JSBI.BigInt(poolData.liquidity.toString()), // pool liquidity
-                                    poolData.slot0[1] // tick
+                                    tickCurrent // tick
                                 );
                                 
                                 const v3Position = new V3Position({
