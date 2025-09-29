@@ -108,9 +108,12 @@ const MyPositions: React.FC<MyPositionsProps> = ({ onIncrease, onRemove }) => {
 
                 const poolAddresses = [...new Set(rawPositions
                     .map(({ result: posData }) => {
-                        const token0Addr = (posData[2] as string).toLowerCase();
-                        const token1Addr = (posData[3] as string).toLowerCase();
-                        const fee = posData[4];
+                        // FIX: Cast posData from 'unknown' to 'any' to allow property access.
+                        // The type is lost due to an `as any` cast on the multicall.
+                        const data = posData as any;
+                        const token0Addr = (data[2] as string).toLowerCase();
+                        const token1Addr = (data[3] as string).toLowerCase();
+                        const fee = data[4];
                         const [sortedAddr0, sortedAddr1] = [token0Addr, token1Addr].sort();
                         const poolKey = `${sortedAddr0}-${sortedAddr1}-${fee}`;
                         return poolLookup.get(poolKey)?.address;
